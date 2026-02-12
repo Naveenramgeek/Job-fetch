@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sqlalchemy import text
 
-from app.database import engine, ensure_tables_exist
+from app.database import engine, init_db
 
 MIGRATIONS = [
     "DROP TABLE IF EXISTS job_embeddings",
@@ -20,7 +20,7 @@ MIGRATIONS = [
 
 
 def main():
-    ensure_tables_exist()  # Create any missing tables first
+    init_db()  # Create any missing tables first
     with engine.connect() as conn:
         for sql in MIGRATIONS:
             try:

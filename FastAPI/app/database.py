@@ -26,8 +26,21 @@ def get_db():
 
 
 def init_db():
-    """Backward-compatible alias for table-safe initialization."""
-    ensure_tables_exist()
+    from app.models import (  # noqa: F401
+        SearchCategory,
+        JobListing,
+        User,
+        Resume,
+        Job,
+        UserJobMatch,
+    )
+
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.exception("Database initialization failed: %s", e)
+        raise
 
 
 def ensure_tables_exist():

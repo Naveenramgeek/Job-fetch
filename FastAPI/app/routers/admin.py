@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db, ensure_tables_exist
+from app.database import get_db, init_db
 from app.dependencies import get_current_admin
 from app.models.user import User
 from app.repos.admin_repo import get_stats
@@ -226,7 +226,7 @@ def seed_categories(
     user: User = Depends(get_current_admin),
 ):
     """Seed default search categories if table is empty. Admin only."""
-    ensure_tables_exist()
+    init_db()
     categories, created_count = seed_default_categories(db)
     if created_count:
         message = f"Created {created_count} default categories."
