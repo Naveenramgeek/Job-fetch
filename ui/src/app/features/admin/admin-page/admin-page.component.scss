@@ -1,0 +1,273 @@
+.admin-page {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.admin-header {
+  margin-bottom: 1.5rem;
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: #e6edf3;
+  }
+
+  p {
+    font-size: 0.95rem;
+    color: #8b949e;
+    margin: 0;
+  }
+}
+
+.error-msg {
+  color: #f85149;
+  margin-bottom: 1rem;
+}
+
+.success-msg {
+  color: #7ee787;
+  margin-top: 0.5rem;
+}
+
+.stats-section,
+.actions-section,
+.users-section {
+  margin-bottom: 2rem;
+
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e6edf3;
+    margin: 0 0 1rem 0;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: rgba(110, 118, 129, 0.15);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e6edf3;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+}
+
+.pipeline-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  .status-badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+
+    &.running {
+      background: rgba(63, 185, 80, 0.2);
+      color: #7ee787;
+    }
+
+    &.stopped {
+      background: rgba(110, 118, 129, 0.2);
+      color: #8b949e;
+    }
+  }
+
+  .status-detail {
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+
+  button mat-icon {
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+}
+
+.btn-spinner {
+  display: inline-block;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.pipeline-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(110, 118, 129, 0.1);
+  border-radius: 8px;
+  font-size: 0.9rem;
+
+  p {
+    margin: 0.25rem 0;
+    color: #c9d1d9;
+  }
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+
+  .filter-field {
+    min-width: 180px;
+  }
+
+  .search-field {
+    min-width: 200px;
+  }
+
+  .page-size-field {
+    max-width: 80px;
+  }
+
+  .pagination-info {
+    font-size: 0.9rem;
+    color: #8b949e;
+  }
+
+  &.search-and-pagination {
+    gap: 0.75rem;
+  }
+}
+
+.user-form-wrap,
+.job-form-wrap {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(110, 118, 129, 0.1);
+  border-radius: 8px;
+
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #e6edf3;
+  }
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 400px;
+
+  mat-form-field {
+    width: 100%;
+  }
+
+  &.admin-form-wide {
+    max-width: 600px;
+
+    .full-width {
+      width: 100%;
+    }
+  }
+
+  .form-checkboxes {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+}
+
+.users-table-wrap,
+.job-listings-table-wrap {
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+  background: rgba(110, 118, 129, 0.08);
+  border-radius: 8px;
+
+  th, td {
+    padding: 0.75rem 1rem;
+    color: #e6edf3;
+    border-bottom: 1px solid rgba(110, 118, 129, 0.2);
+  }
+
+  th {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+
+  button {
+    font-size: 0.85rem;
+  }
+
+  a {
+    color: #58a6ff;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.job-listings-section {
+  margin-top: 2rem;
+}
+
+@media (max-width: 900px) {
+  .admin-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .section-actions {
+    gap: 0.5rem;
+
+    .filter-field,
+    .search-field,
+    .page-size-field {
+      min-width: 0;
+      width: 100%;
+      max-width: none;
+    }
+  }
+
+  .action-buttons {
+    gap: 0.6rem;
+  }
+}

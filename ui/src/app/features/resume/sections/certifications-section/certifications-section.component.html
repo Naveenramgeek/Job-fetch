@@ -1,0 +1,23 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Certifications</h2>
+  <p class="section-desc">Certifications and awards. Add the name or description and an optional certificate link.</p>
+  <div class="item-block cert-block" *ngFor="let cert of certifications; let i = index" [@itemEnter]>
+    <div class="cert-row">
+      <mat-form-field appearance="outline" class="full cert-field">
+        <mat-label>Certification {{ i + 1 }}</mat-label>
+        <textarea matInput [(ngModel)]="certifications[i].text" rows="2" placeholder="e.g. IBM Generative AI for Software Development"></textarea>
+      </mat-form-field>
+      <button mat-icon-button type="button" (click)="removeItem(i)" color="warn" matTooltip="Remove">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <mat-form-field appearance="outline" class="full cert-link-field">
+      <mat-label>Link (certificate / verification URL)</mat-label>
+      <input matInput [(ngModel)]="certifications[i].link" placeholder="https://..." />
+    </mat-form-field>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addItem()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add certification
+  </button>
+</div>

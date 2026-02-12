@@ -1,0 +1,8 @@
+<h2 mat-dialog-title>Delete account?</h2>
+<mat-dialog-content>
+  <p>This will permanently delete your account and all data (resumes, jobs). This action cannot be undone.</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button mat-flat-button color="warn" (click)="confirm()">Delete account</button>
+</mat-dialog-actions>

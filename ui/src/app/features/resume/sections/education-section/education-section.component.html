@@ -1,0 +1,51 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Education</h2>
+  <p class="section-desc">Degrees and institutions.</p>
+  <ng-container *ngIf="education.length === 0">
+    <div class="missing-section-hint">
+      <strong>This section is empty.</strong> If your resume had education, it may be in the <strong>Other</strong> tab. Copy from there and add an entry here.
+    </div>
+  </ng-container>
+  <div class="item-block" *ngFor="let item of education; let i = index" [@itemEnter]>
+    <div class="item-header">
+      <span class="item-index">#{{ i + 1 }}</span>
+      <button mat-icon-button type="button" (click)="removeItem(i)" color="warn" matTooltip="Remove">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <div class="form-grid compact">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Degree</mat-label>
+        <input matInput [(ngModel)]="item.degree" placeholder="e.g. MS in Computer Science" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Institution</mat-label>
+        <input matInput [(ngModel)]="item.institution" placeholder="University name" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Location</mat-label>
+        <input matInput [(ngModel)]="item.location" placeholder="City, Country" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Start</mat-label>
+        <input matInput [(ngModel)]="item.start" placeholder="Aug 2020" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>End</mat-label>
+        <input matInput [(ngModel)]="item.end" placeholder="May 2022" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>GPA</mat-label>
+        <input matInput [(ngModel)]="item.gpa" placeholder="3.8/4" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Duration (display)</mat-label>
+        <input matInput [(ngModel)]="item.duration" placeholder="Aug 2020 – May 2022" />
+      </mat-form-field>
+    </div>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addItem()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add education
+  </button>
+</div>

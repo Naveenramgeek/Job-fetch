@@ -1,0 +1,11 @@
+// Component-specific styles (shared styles in section-common.scss)
+.project-title-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0.25rem;
+
+  .full {
+    width: 100%;
+  }
+}

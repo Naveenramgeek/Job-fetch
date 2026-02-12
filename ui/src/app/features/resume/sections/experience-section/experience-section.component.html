@@ -1,0 +1,60 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Experience</h2>
+  <p class="section-desc">Work experience. Add entries or edit parsed data.</p>
+  <ng-container *ngIf="experience.length === 0">
+    <div class="missing-section-hint">
+      <strong>This section is empty.</strong> If your resume had work experience, it may be in the <strong>Other</strong> tab (unparsed). Open the Other tab, copy the text, then add an entry here and paste.
+    </div>
+  </ng-container>
+  <div class="item-block" *ngFor="let item of experience; let i = index" [@itemEnter]>
+    <div class="item-header">
+      <span class="item-index">#{{ i + 1 }}</span>
+      <button mat-icon-button type="button" (click)="removeItem(i)" color="warn" matTooltip="Remove">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <div class="form-grid compact">
+      <mat-form-field appearance="outline">
+        <mat-label>Title</mat-label>
+        <input matInput [(ngModel)]="item.title" placeholder="Job title" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Company</mat-label>
+        <input matInput [(ngModel)]="item.company" placeholder="Company name" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Location</mat-label>
+        <input matInput [(ngModel)]="item.location" placeholder="City, Country" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Start</mat-label>
+        <input matInput [(ngModel)]="item.start" placeholder="Jan 2020" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>End</mat-label>
+        <input matInput [(ngModel)]="item.end" placeholder="Present" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Duration (display)</mat-label>
+        <input matInput [(ngModel)]="item.duration" placeholder="Jan 2020 – Present" />
+      </mat-form-field>
+    </div>
+    <div class="bullets">
+      <label class="bullets-label">Bullets</label>
+      <div class="bullet-row" *ngFor="let b of item.bullets; let bi = index">
+        <textarea class="bullet-textarea" [(ngModel)]="item.bullets[bi]" placeholder="Achievement or responsibility" rows="3"></textarea>
+        <button mat-icon-button type="button" (click)="removeBullet(item, bi)" color="warn" matTooltip="Remove bullet">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <button mat-stroked-button type="button" (click)="addBullet(item)">
+        <mat-icon>add</mat-icon>
+        Add bullet
+      </button>
+    </div>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addItem()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add experience
+  </button>
+</div>

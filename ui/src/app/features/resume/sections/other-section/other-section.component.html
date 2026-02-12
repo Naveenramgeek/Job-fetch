@@ -1,0 +1,22 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Other / Unparsed</h2>
+  <p class="section-desc">Content that didn't fit other sections (e.g. experience that failed to parse). Copy text from here and paste it into the right section tab above.</p>
+  <div class="item-block other-block" *ngFor="let block of other; let i = index; trackBy: trackByIndex" [@itemEnter]>
+    <div class="item-header">
+      <span class="item-index">#{{ i + 1 }}</span>
+      <span class="other-reason" *ngIf="block.reason">{{ block.reason }}</span>
+      <button mat-icon-button type="button" (click)="removeBlock(i)" color="warn" matTooltip="Remove block">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Section title</mat-label>
+      <input matInput [(ngModel)]="block.heading" placeholder="e.g. Header, Block" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full other-text-field">
+      <mat-label>Content</mat-label>
+      <textarea matInput [(ngModel)]="block.text" rows="16" class="textarea-other" placeholder="Raw or unparsed text — copy and paste into Contact, Experience, etc. as needed"></textarea>
+    </mat-form-field>
+  </div>
+  <p class="empty-hint" *ngIf="!other?.length">No other blocks.</p>
+</div>

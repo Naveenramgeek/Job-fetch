@@ -1,0 +1,30 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Your sections</h2>
+  <p class="section-desc">Add any section that wasn't parsed (e.g. Awards, Publications, Volunteering). Section name, title, and description.</p>
+  <div class="item-block custom-block" *ngFor="let section of customSections; let i = index" [@itemEnter]>
+    <div class="item-header">
+      <span class="item-index">#{{ i + 1 }}</span>
+      <button mat-icon-button type="button" (click)="removeSection(i)" color="warn" matTooltip="Remove section">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <div class="custom-fields-stack">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Section name</mat-label>
+        <input matInput [(ngModel)]="section.title" placeholder="e.g. Awards, Publications" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Title</mat-label>
+        <input matInput [(ngModel)]="section.link" placeholder="e.g. Award name or section subtitle" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full custom-content-field">
+        <mat-label>Description</mat-label>
+        <textarea matInput [(ngModel)]="section.content" rows="6" class="textarea-large" placeholder="Paste or type the content for this section..."></textarea>
+      </mat-form-field>
+    </div>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addSection()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add your own section
+  </button>
+</div>

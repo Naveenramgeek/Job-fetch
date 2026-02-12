@@ -1,0 +1,32 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-header">
+      <img class="logo-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+      <h1>JobFetch</h1>
+      <p>Track jobs, manage resumes, stay organized</p>
+    </div>
+    <form class="login-form" (ngSubmit)="onSubmit()">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" [(ngModel)]="email" name="email" placeholder="you@example.com" [disabled]="loading" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" [(ngModel)]="password" name="password" placeholder="••••••••" [disabled]="loading" />
+      </mat-form-field>
+      <p class="forgot-link">
+        <a routerLink="/auth/forgot-password">Forgot password?</a>
+      </p>
+      <p class="error-msg" *ngIf="error">{{ error }}</p>
+      <button mat-raised-button color="primary" type="submit" class="login-btn" [disabled]="loading">
+        <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+        <span *ngIf="!loading">Sign in</span>
+      </button>
+    </form>
+    <p class="signup-link">
+      Don't have an account?
+      <a routerLink="/signup">Sign up</a>
+    </p>
+  </div>
+  <p class="app-copyright">© 2026 Naveen Vemula. All rights reserved</p>
+</div>

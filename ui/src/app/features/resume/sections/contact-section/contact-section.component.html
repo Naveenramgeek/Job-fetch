@@ -1,0 +1,35 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Contact</h2>
+  <p class="section-desc">Review and correct contact details.</p>
+  <div class="form-grid">
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Name</mat-label>
+      <input matInput [(ngModel)]="contact.name" placeholder="Full name" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full" floatLabel="always">
+      <mat-label>Professional title</mat-label>
+      <input matInput [(ngModel)]="contact.title" placeholder="e.g. Software Engineer, Senior DevOps Engineer" />
+      <mat-hint>Jobs will be fetched based on this title.</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Email</mat-label>
+      <input matInput type="email" [(ngModel)]="contact.email" placeholder="email@example.com" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Phone</mat-label>
+      <input matInput [(ngModel)]="contact.phone" placeholder="+1 (xxx) xxx-xxxx" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>LinkedIn</mat-label>
+      <input matInput [(ngModel)]="contact.linkedin" placeholder="linkedin.com/in/username" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>GitHub</mat-label>
+      <input matInput [(ngModel)]="contact.github" placeholder="github.com/username" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full">
+      <mat-label>Location</mat-label>
+      <input matInput [(ngModel)]="contact.location" placeholder="City, Country" />
+    </mat-form-field>
+  </div>
+</div>

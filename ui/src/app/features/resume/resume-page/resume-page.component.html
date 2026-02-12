@@ -1,0 +1,183 @@
+<div class="page" [@pageEnter]>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">
+        <img class="logo-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+        Resume Structurer
+      </h1>
+      <p class="tagline">Build your resume in the form, export JSON</p>
+      <div class="header-actions" *ngIf="resume">
+        <input
+          #headerFileInput
+          type="file"
+          accept=".pdf,application/pdf"
+          (change)="onFileSelected($event)"
+          style="display: none"
+        />
+        <button mat-stroked-button color="primary" (click)="headerFileInput.click()" [disabled]="loading">
+          <mat-icon>upload_file</mat-icon>
+          Upload PDF
+        </button>
+        <button mat-raised-button color="primary" (click)="saveResume()" [disabled]="saving">
+          <mat-spinner *ngIf="saving" diameter="20" class="btn-spinner"></mat-spinner>
+          <mat-icon *ngIf="!saving">save</mat-icon>
+          {{ saving ? 'Saving...' : 'Save' }}
+        </button>
+        <button mat-stroked-button color="primary" (click)="copyJson()">
+          <mat-icon>content_copy</mat-icon>
+          Copy JSON
+        </button>
+        <button mat-stroked-button color="primary" (click)="exportJson()">
+          <mat-icon>download</mat-icon>
+          Export JSON
+        </button>
+        <button mat-button (click)="reset()">New resume</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div *ngIf="!resume" class="start-section">
+      <p class="start-hint">Upload a PDF to parse, load your saved resume, or start a new one.</p>
+      <div class="start-actions">
+        <input
+          #fileInput
+          type="file"
+          accept=".pdf,application/pdf"
+          (change)="onFileSelected($event)"
+          style="display: none"
+        />
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="fileInput.click()"
+          [disabled]="loading"
+          *ngIf="auth.currentUserValue"
+        >
+          <mat-icon>upload_file</mat-icon>
+          Upload PDF
+        </button>
+        <button
+          mat-stroked-button
+          color="primary"
+          class="load-saved-btn"
+          (click)="loadSavedResume()"
+          [disabled]="loading"
+          *ngIf="auth.currentUserValue"
+        >
+          <mat-icon>cloud_download</mat-icon>
+          Load saved resume
+        </button>
+        <button mat-stroked-button color="primary" (click)="startNewResume()" [disabled]="loading">
+          <mat-icon>add</mat-icon>
+          Start new resume
+        </button>
+      </div>
+      <p class="error-msg" *ngIf="uploadError">{{ uploadError }}</p>
+      <mat-spinner *ngIf="loading" diameter="32" class="loading-spinner"></mat-spinner>
+    </div>
+
+    <div *ngIf="resume" class="edit-view" [@editEnter]>
+      <div class="section-nav-mobile">
+        <mat-form-field appearance="outline" class="section-select">
+          <mat-label>Section</mat-label>
+          <mat-select [(value)]="activeTabIndex" (selectionChange)="activeTabIndex = $event.value">
+            <mat-option [value]="0">Contact</mat-option>
+            <mat-option [value]="1">Summary</mat-option>
+            <mat-option [value]="2">Experience</mat-option>
+            <mat-option [value]="3">Education</mat-option>
+            <mat-option [value]="4">Projects</mat-option>
+            <mat-option [value]="5">Skills</mat-option>
+            <mat-option [value]="6">Certifications</mat-option>
+            <mat-option [value]="7">Other</mat-option>
+            <mat-option [value]="8">Your sections</mat-option>
+            <mat-option [value]="9">Tailor resume</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <mat-tab-group
+        [(selectedIndex)]="activeTabIndex"
+        (selectedIndexChange)="onTabChange($event)"
+        animationDuration="200ms"
+        class="section-tabs"
+      >
+        <mat-tab label="Contact">
+          <app-contact-section [contact]="resume.contact"></app-contact-section>
+        </mat-tab>
+        <mat-tab label="Summary">
+          <app-summary-section [(summary)]="resume.summary"></app-summary-section>
+        </mat-tab>
+        <mat-tab label="Experience">
+          <app-experience-section [experience]="resume.experience"></app-experience-section>
+        </mat-tab>
+        <mat-tab label="Education">
+          <app-education-section [education]="resume.education"></app-education-section>
+        </mat-tab>
+        <mat-tab label="Projects">
+          <app-projects-section [projects]="resume.projects"></app-projects-section>
+        </mat-tab>
+        <mat-tab label="Skills">
+          <app-skills-section [skills]="resume.skills"></app-skills-section>
+        </mat-tab>
+        <mat-tab label="Certifications">
+          <app-certifications-section [certifications]="resume.certifications"></app-certifications-section>
+        </mat-tab>
+        <mat-tab label="Other">
+          <app-other-section [other]="resume.other"></app-other-section>
+        </mat-tab>
+        <mat-tab label="Your sections">
+          <app-custom-sections [customSections]="getCustomSections()"></app-custom-sections>
+        </mat-tab>
+        <mat-tab label="Tailor Resume">
+          <div class="tailor-tab">
+            <div class="jd-inputs">
+              <mat-form-field appearance="outline">
+                <mat-label>Job title (optional)</mat-label>
+                <input matInput [(ngModel)]="tailorJobTitle" placeholder="Senior Backend Engineer" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Job description</mat-label>
+                <textarea
+                  matInput
+                  rows="8"
+                  [(ngModel)]="tailorJdText"
+                  placeholder="Paste full job description text here..."
+                ></textarea>
+              </mat-form-field>
+              <button mat-raised-button color="primary" (click)="generateTailorFromJd()" [disabled]="tailorLoading || !tailorJdText.trim()">
+                <mat-spinner *ngIf="tailorLoading" diameter="20" class="btn-spinner"></mat-spinner>
+                <span *ngIf="!tailorLoading">Tailor Resume</span>
+              </button>
+            </div>
+
+            <p class="error-msg" *ngIf="tailorError">{{ tailorError }}</p>
+
+            <div class="tailor-split">
+              <div class="tailor-panel">
+                <div class="tailor-panel-header">
+                  <h3>LaTeX</h3>
+                  <button mat-stroked-button (click)="downloadTailorTex()" [disabled]="!tailorLatex">Download text</button>
+                </div>
+                <div #resumeTailorEditor class="tailor-editor" [class.disabled]="tailorLoading"></div>
+              </div>
+
+              <div class="tailor-panel">
+                <div class="tailor-panel-header">
+                  <h3>PDF Preview</h3>
+                  <button mat-stroked-button color="primary" (click)="renderTailorPdf()" [disabled]="tailorRenderLoading || tailorLoading || !tailorLatex">
+                    Render PDF
+                  </button>
+                </div>
+                <div class="tailor-state" *ngIf="tailorLoading || tailorRenderLoading">Rendering preview...</div>
+                <iframe *ngIf="!tailorLoading && !tailorRenderLoading && tailorPdfPreviewUrl" [src]="tailorPdfPreviewUrl"></iframe>
+                <div class="tailor-state" *ngIf="!tailorLoading && !tailorRenderLoading && !tailorPdfPreviewUrl">
+                  Add JD text and click Tailor Resume.
+                </div>
+              </div>
+            </div>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,136 @@
+<div class="dashboard">
+  <div class="dashboard-header">
+    <h1>Job Dashboard</h1>
+    <p>Your tracked jobs and tailored resumes</p>
+  </div>
+
+  <div class="resume-cta" *ngIf="!auth.currentUserValue?.hasResume">
+    <div class="cta-content">
+      <mat-icon>description</mat-icon>
+      <div>
+        <strong>No resume yet</strong>
+        <span>Add your resume to get matched with jobs.</span>
+      </div>
+      <button mat-raised-button color="primary" (click)="goToResume()">
+        <mat-icon>add</mat-icon>
+        Add Resume
+      </button>
+    </div>
+  </div>
+
+  <div class="jobs-section">
+    <div class="jobs-section-header">
+      <h2>Job Listings</h2>
+      <p class="fetch-hint" *ngIf="auth.currentUserValue?.hasResume">LLM-matched jobs from the pipeline. Run the collector script to fetch new jobs.</p>
+      <button
+        *ngIf="auth.currentUserValue?.hasResume"
+        mat-raised-button
+        color="primary"
+        (click)="fetchJobs()"
+        [disabled]="fetchLoading"
+      >
+        <mat-spinner *ngIf="fetchLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <span *ngIf="!fetchLoading">Fetch jobs</span>
+      </button>
+    </div>
+    <p class="error-msg" *ngIf="fetchError">{{ fetchError }}</p>
+    <div class="job-grid" *ngIf="jobListings.length">
+      <div
+        class="job-card"
+        *ngFor="let job of jobListings"
+        [class.not-applied]="job.status === 'not_applied'"
+      >
+        <div class="job-card-main" (click)="openJob(job)">
+          <div class="job-info">
+            <h3 class="job-title">{{ job.title }}</h3>
+            <p class="job-company">{{ job.company }}</p>
+            <p class="job-location" *ngIf="job.location">{{ job.location }}</p>
+            <span class="match-badge" *ngIf="job.matchScore != null">{{ matchScorePercent(job) }}</span>
+            <span class="old-badge" *ngIf="isOlderThan24h(job)">Older than 24h</span>
+          </div>
+          <div class="job-actions">
+            <button mat-stroked-button color="accent" matTooltip="Generate tailored resume" (click)="tailorResume(job, $event)">
+              Tailor Resume
+            </button>
+            <button mat-icon-button matTooltip="Open job posting" (click)="openJob(job); $event.stopPropagation()">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          </div>
+        </div>
+        <div class="job-status">
+          <span class="status-badge" [class]="job.status">Pending</span>
+          <div class="status-actions">
+            <button mat-stroked-button color="primary" (click)="markStatus(job, 'applied', $event)">
+              Applied
+            </button>
+            <button mat-stroked-button (click)="markStatus(job, 'not_applied', $event)">
+              Not Applied
+            </button>
+            <button mat-stroked-button (click)="skipJob(job, $event)">
+              Skip
+            </button>
+            <button mat-stroked-button color="warn" *ngIf="isOlderThan24h(job)" (click)="deleteJob(job, $event)" matTooltip="Remove old job from list">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="jobs-pagination" *ngIf="pendingTotal > jobsPerPage">
+      <button mat-stroked-button (click)="prevPendingPage()" [disabled]="!canPrevPending()">
+        <mat-icon>chevron_left</mat-icon>
+        Previous
+      </button>
+      <span>Page {{ pendingPage }} of {{ pendingTotalPages() }} ({{ pendingTotal }} jobs)</span>
+      <button mat-stroked-button (click)="nextPendingPage()" [disabled]="!canNextPending()">
+        Next
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+    <p class="empty-hint" *ngIf="!jobListings.length && !appliedByDate.length">No jobs yet. Jobs will appear here when sent from the backend.</p>
+    <p class="empty-hint" *ngIf="!jobListings.length && appliedByDate.length">No active listings. All jobs have been moved to Applied.</p>
+  </div>
+
+  <div class="applied-section" *ngIf="appliedByDate.length">
+    <h2>Applied</h2>
+    <div class="applied-by-date" *ngFor="let group of appliedByDate">
+      <h3 class="applied-date-heading">{{ formatDate(group.date) }}</h3>
+      <div class="job-grid">
+        <div class="job-card applied" *ngFor="let job of group.jobs">
+          <div class="job-card-main" (click)="openJob(job)">
+            <div class="job-info">
+              <h3 class="job-title">{{ job.title }}</h3>
+              <p class="job-company">{{ job.company }}</p>
+              <p class="job-location" *ngIf="job.location">{{ job.location }}</p>
+              <span class="old-badge" *ngIf="isOlderThan24h(job)">Older than 24h</span>
+            </div>
+            <div class="job-actions">
+              <button mat-stroked-button color="accent" matTooltip="Generate tailored resume" (click)="tailorResume(job, $event)">
+                Tailor Resume
+              </button>
+              <button mat-icon-button matTooltip="Open job posting" (click)="openJob(job); $event.stopPropagation()">
+                <mat-icon>open_in_new</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="job-status">
+            <span class="status-badge applied">Applied</span>
+            <button mat-stroked-button (click)="skipJob(job, $event)">Skip</button>
+            <button mat-stroked-button color="warn" *ngIf="isOlderThan24h(job)" (click)="deleteJob(job, $event)" matTooltip="Remove old job">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="jobs-pagination" *ngIf="appliedTotal > jobsPerPage">
+      <button mat-stroked-button (click)="prevAppliedPage()" [disabled]="!canPrevApplied()">
+        <mat-icon>chevron_left</mat-icon>
+        Previous
+      </button>
+      <span>Page {{ appliedPage }} of {{ appliedTotalPages() }} ({{ appliedTotal }} applied)</span>
+      <button mat-stroked-button (click)="nextAppliedPage()" [disabled]="!canNextApplied()">
+        Next
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>

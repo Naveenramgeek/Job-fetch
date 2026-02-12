@@ -1,0 +1,314 @@
+<div class="admin-page">
+  <div class="admin-header">
+    <h1>Admin Dashboard</h1>
+    <p>Manage users, run pipeline, and system actions</p>
+  </div>
+
+  <p class="error-msg" *ngIf="error">{{ error }}</p>
+
+  <section class="stats-section">
+    <h2>Statistics</h2>
+    <mat-spinner *ngIf="loading" diameter="32"></mat-spinner>
+    <div class="stats-grid" *ngIf="stats && !loading">
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.users_total }}</span>
+        <span class="stat-label">Total Users</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.users_active }}</span>
+        <span class="stat-label">Active Users</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.job_listings }}</span>
+        <span class="stat-label">Job Listings</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.user_job_matches }}</span>
+        <span class="stat-label">User Matches</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.categories }}</span>
+        <span class="stat-label">Categories</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ stats.admins }}</span>
+        <span class="stat-label">Admins</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="actions-section">
+    <h2>Actions</h2>
+    <div class="pipeline-status" *ngIf="pipelineStatus">
+      <span class="status-badge" [class.running]="pipelineStatus.running" [class.stopped]="!pipelineStatus.running">
+        {{ pipelineStatus.running ? 'Running every ' + pipelineStatus.interval_hours + ' h' : 'Stopped' }}
+      </span>
+      <span class="status-detail" *ngIf="pipelineStatus.last_run">Last run: {{ formatDate(pipelineStatus.last_run) }}</span>
+      <span class="status-detail" *ngIf="pipelineStatus.running && pipelineStatus.next_run">Next run: {{ formatDate(pipelineStatus.next_run) }}</span>
+    </div>
+    <div class="action-buttons">
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="runPipeline()"
+        [disabled]="startStopLoading || (pipelineStatus?.running ?? false)"
+      >
+        <mat-spinner *ngIf="startStopLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!startStopLoading">play_arrow</mat-icon>
+        Run job pipeline
+      </button>
+      <button
+        mat-raised-button
+        color="warn"
+        (click)="stopPipeline()"
+        [disabled]="startStopLoading || !(pipelineStatus?.running ?? false)"
+      >
+        <mat-spinner *ngIf="startStopLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!startStopLoading">stop</mat-icon>
+        Stop job pipeline
+      </button>
+      <button
+        mat-stroked-button
+        (click)="seedCategories()"
+        [disabled]="seedLoading"
+      >
+        <mat-spinner *ngIf="seedLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!seedLoading">category</mat-icon>
+        {{ seedLoading ? 'Seeding...' : 'Seed Categories' }}
+      </button>
+    </div>
+    <p class="success-msg" *ngIf="startStopMessage">{{ startStopMessage }}</p>
+    <p class="success-msg" *ngIf="seedMessage">{{ seedMessage }}</p>
+    <p class="error-msg" *ngIf="pipelineError">{{ pipelineError }}</p>
+  </section>
+
+  <section class="users-section">
+    <h2>Users</h2>
+    <div class="section-actions search-and-pagination">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search by email</mat-label>
+        <input matInput [(ngModel)]="userSearch" name="userSearch" (keyup.enter)="onUserSearch()" />
+        <button mat-icon-button matSuffix (click)="onUserSearch()" matTooltip="Search">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+      <button mat-raised-button (click)="onUserSearch()">Search</button>
+      <span class="pagination-info">{{ userTotal ? 'Showing ' + ((userPage - 1) * userPageSize + 1) + '–' + min(userPage * userPageSize, userTotal) + ' of ' + userTotal : '0 of 0' }}</span>
+      <mat-form-field appearance="outline" class="page-size-field">
+        <mat-label>Per page</mat-label>
+        <mat-select [(ngModel)]="userPageSize" (selectionChange)="onUserPageSizeChange()" name="userPageSize">
+          <mat-option [value]="10">10</mat-option>
+          <mat-option [value]="20">20</mat-option>
+          <mat-option [value]="50">50</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button (click)="onUserPageChange(userPage - 1)" [disabled]="userPage <= 1" matTooltip="Previous">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-icon-button (click)="onUserPageChange(userPage + 1)" [disabled]="userPage * userPageSize >= userTotal" matTooltip="Next">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+      <button mat-raised-button color="primary" (click)="openAddUser()" [disabled]="showUserForm">
+        <mat-icon>person_add</mat-icon>
+        Add user
+      </button>
+    </div>
+    <div class="user-form-wrap" *ngIf="showUserForm">
+      <h3>{{ editingUserId ? 'Edit user' : 'New user' }}</h3>
+      <form (ngSubmit)="saveUser()" class="admin-form">
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput [(ngModel)]="userForm.email" name="userEmail" required email />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Password{{ editingUserId ? ' (leave blank to keep)' : '' }}</mat-label>
+          <input matInput type="password" [(ngModel)]="userForm.password" name="userPassword" [required]="!editingUserId" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" *ngIf="categories.length">
+          <mat-label>Category</mat-label>
+          <mat-select [(ngModel)]="userForm.search_category_id" name="userCategory">
+            <mat-option [value]="null">— None —</mat-option>
+            <mat-option *ngFor="let c of categories" [value]="c.id">{{ c.display_name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="form-checkboxes">
+          <mat-checkbox [(ngModel)]="userForm.is_admin" name="userAdmin">Admin</mat-checkbox>
+          <mat-checkbox [(ngModel)]="userForm.is_active" name="userActive">Active</mat-checkbox>
+        </div>
+        <p class="error-msg" *ngIf="userFormError">{{ userFormError }}</p>
+        <div class="form-actions">
+          <button mat-button type="button" (click)="cancelUserForm()">Cancel</button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="userSaveLoading || !userForm.email || (!editingUserId && !userForm.password)">
+            {{ userSaveLoading ? 'Saving...' : (editingUserId ? 'Update' : 'Create') }}
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="users-table-wrap">
+      <table class="users-table" mat-table [dataSource]="users">
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef>Email</th>
+          <td mat-cell *matCellDef="let u">{{ u.email }}</td>
+        </ng-container>
+        <ng-container matColumnDef="is_active">
+          <th mat-header-cell *matHeaderCellDef>Active</th>
+          <td mat-cell *matCellDef="let u">
+            <button mat-stroked-button [color]="u.is_active ? 'primary' : 'warn'" (click)="toggleActive(u)">
+              {{ u.is_active ? 'Active' : 'Inactive' }}
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="is_admin">
+          <th mat-header-cell *matHeaderCellDef>Admin</th>
+          <td mat-cell *matCellDef="let u">
+            <button mat-stroked-button [color]="u.is_admin ? 'accent' : ''" (click)="toggleAdmin(u)">
+              {{ u.is_admin ? 'Admin' : 'User' }}
+            </button>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="created_at">
+          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <td mat-cell *matCellDef="let u">{{ formatDate(u.created_at) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let u">
+            <button mat-icon-button (click)="openEditUser(u)" matTooltip="Edit">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteUser(u)" matTooltip="Delete">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['email', 'is_active', 'is_admin', 'created_at', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['email', 'is_active', 'is_admin', 'created_at', 'actions']"></tr>
+      </table>
+    </div>
+    <p *ngIf="!users.length && !loading">No users yet.</p>
+  </section>
+
+  <section class="job-listings-section">
+    <h2>Job listings</h2>
+    <div class="section-actions search-and-pagination">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search by title or company</mat-label>
+        <input matInput [(ngModel)]="jobSearch" name="jobSearch" (keyup.enter)="onJobSearch()" />
+        <button mat-icon-button matSuffix (click)="onJobSearch()" matTooltip="Search">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+      <button mat-raised-button (click)="onJobSearch()">Search</button>
+      <mat-form-field appearance="outline" class="filter-field" *ngIf="categories.length">
+        <mat-label>Category</mat-label>
+        <mat-select [(ngModel)]="jobCategoryFilter" (selectionChange)="onJobCategoryFilterChange()" name="jobFilter">
+          <mat-option [value]="null">All</mat-option>
+          <mat-option *ngFor="let c of categories" [value]="c.id">{{ c.display_name }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <span class="pagination-info">{{ jobTotal ? 'Showing ' + ((jobPage - 1) * jobPageSize + 1) + '–' + min(jobPage * jobPageSize, jobTotal) + ' of ' + jobTotal : '0 of 0' }}</span>
+      <mat-form-field appearance="outline" class="page-size-field">
+        <mat-label>Per page</mat-label>
+        <mat-select [(ngModel)]="jobPageSize" (selectionChange)="onJobPageSizeChange()" name="jobPageSize">
+          <mat-option [value]="10">10</mat-option>
+          <mat-option [value]="20">20</mat-option>
+          <mat-option [value]="50">50</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button (click)="onJobPageChange(jobPage - 1)" [disabled]="jobPage <= 1" matTooltip="Previous">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-icon-button (click)="onJobPageChange(jobPage + 1)" [disabled]="jobPage * jobPageSize >= jobTotal" matTooltip="Next">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+      <button mat-raised-button color="primary" (click)="openAddJob()" [disabled]="showJobForm || !categories.length">
+        <mat-icon>add</mat-icon>
+        Add job listing
+      </button>
+      <button mat-raised-button color="warn" (click)="deleteAllJobs()" [disabled]="deleteAllJobsLoading || jobTotal === 0" matTooltip="Delete all job listings">
+        <mat-icon>delete_forever</mat-icon>
+        Delete all
+      </button>
+    </div>
+    <div class="job-form-wrap" *ngIf="showJobForm">
+      <h3>{{ editingJobId ? 'Edit job listing' : 'New job listing' }}</h3>
+      <form (ngSubmit)="saveJob()" class="admin-form admin-form-wide">
+        <mat-form-field appearance="outline">
+          <mat-label>Category</mat-label>
+          <mat-select [(ngModel)]="jobForm.search_category_id" name="jobCategory" required>
+            <mat-option *ngFor="let c of categories" [value]="c.id">{{ c.display_name }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Title</mat-label>
+          <input matInput [(ngModel)]="jobForm.title" name="jobTitle" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Company</mat-label>
+          <input matInput [(ngModel)]="jobForm.company" name="jobCompany" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Job URL</mat-label>
+          <input matInput [(ngModel)]="jobForm.job_url" name="jobUrl" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Location</mat-label>
+          <input matInput [(ngModel)]="jobForm.location" name="jobLocation" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Posted at</mat-label>
+          <input matInput [(ngModel)]="jobForm.posted_at" name="jobPostedAt" placeholder="e.g. 2 days ago" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Description</mat-label>
+          <textarea matInput [(ngModel)]="jobForm.description" name="jobDesc" rows="4"></textarea>
+        </mat-form-field>
+        <p class="error-msg" *ngIf="jobFormError">{{ jobFormError }}</p>
+        <div class="form-actions">
+          <button mat-button type="button" (click)="cancelJobForm()">Cancel</button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="jobSaveLoading || !jobForm.title || !jobForm.company || !jobForm.job_url || !jobForm.search_category_id">
+            {{ jobSaveLoading ? 'Saving...' : (editingJobId ? 'Update' : 'Create') }}
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="job-listings-table-wrap">
+      <table class="users-table job-listings-table" mat-table [dataSource]="jobListings">
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef>Title</th>
+          <td mat-cell *matCellDef="let j">{{ j.title }}</td>
+        </ng-container>
+        <ng-container matColumnDef="company">
+          <th mat-header-cell *matHeaderCellDef>Company</th>
+          <td mat-cell *matCellDef="let j">{{ j.company }}</td>
+        </ng-container>
+        <ng-container matColumnDef="location">
+          <th mat-header-cell *matHeaderCellDef>Location</th>
+          <td mat-cell *matCellDef="let j">{{ j.location || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let j">{{ categoryDisplay(j.search_category_id) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="job_url">
+          <th mat-header-cell *matHeaderCellDef>URL</th>
+          <td mat-cell *matCellDef="let j"><a [href]="j.job_url" target="_blank" rel="noopener">Link</a></td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let j">
+            <button mat-icon-button (click)="openEditJob(j)" matTooltip="Edit">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteJob(j)" matTooltip="Delete">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['title', 'company', 'location', 'category', 'job_url', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['title', 'company', 'location', 'category', 'job_url', 'actions']"></tr>
+      </table>
+    </div>
+    <p *ngIf="!jobListings.length && !loading">No job listings. Seed categories first, or run the pipeline.</p>
+  </section>
+</div>

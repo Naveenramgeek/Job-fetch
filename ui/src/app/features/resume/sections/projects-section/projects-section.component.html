@@ -1,0 +1,44 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Projects</h2>
+  <p class="section-desc">Projects with optional repo/demo link. Use <strong>Project name</strong> for the title only; put the URL in <strong>Link</strong>. If a link was parsed into the title, move it to the Link field below.</p>
+  <ng-container *ngIf="projects.length === 0">
+    <div class="missing-section-hint">
+      <strong>This section is empty.</strong> Check the <strong>Other</strong> tab for unparsed project text; copy and add an entry here.
+    </div>
+  </ng-container>
+  <div class="item-block" *ngFor="let proj of projects; let i = index" [@itemEnter]>
+    <div class="item-header">
+      <span class="item-index">#{{ i + 1 }}</span>
+      <button mat-icon-button type="button" (click)="removeItem(i)" color="warn" matTooltip="Remove">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <div class="project-title-link">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Project name (title)</mat-label>
+        <input matInput [(ngModel)]="proj.name" placeholder="e.g. Real-time Collaborative Coding Platform" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Link (repo / demo URL)</mat-label>
+        <input matInput [(ngModel)]="proj.link" placeholder="https://github.com/..." />
+      </mat-form-field>
+    </div>
+    <div class="bullets">
+      <label class="bullets-label">Bullets</label>
+      <div class="bullet-row" *ngFor="let b of proj.bullets; let bi = index">
+        <textarea class="bullet-textarea" [(ngModel)]="proj.bullets[bi]" placeholder="What you built or achieved" rows="3"></textarea>
+        <button mat-icon-button type="button" (click)="removeBullet(proj, bi)" color="warn" matTooltip="Remove bullet">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <button mat-stroked-button type="button" (click)="addBullet(proj)">
+        <mat-icon>add</mat-icon>
+        Add bullet
+      </button>
+    </div>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addItem()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add project
+  </button>
+</div>

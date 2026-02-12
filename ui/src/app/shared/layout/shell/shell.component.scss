@@ -1,0 +1,174 @@
+.shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(165deg, #0f1419 0%, #1a2332 50%, #0f1419 100%);
+  overflow-x: hidden;
+}
+
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(15, 20, 25, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.shell-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.header-start {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #e6edf3;
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #7ee787;
+  }
+
+  .logo-icon {
+    width: 1.55rem;
+    height: 1.55rem;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(126, 231, 135, 0.2));
+  }
+}
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+
+  button {
+    color: #8b949e;
+
+    &:hover {
+      color: #e6edf3;
+    }
+
+    &.active {
+      color: #7ee787;
+    }
+  }
+}
+
+.mobile-nav-btn {
+  display: none;
+}
+
+.user-area {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .user-email {
+    font-size: 0.85rem;
+    color: #8b949e;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    @media (max-width: 600px) {
+      display: none;
+    }
+  }
+}
+
+.menu-user-info {
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  strong {
+    color: #e6edf3;
+  }
+
+  span {
+    font-size: 0.85rem;
+    color: #8b949e;
+  }
+}
+
+.shell-main {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.shell-footer {
+  padding: 0.5rem 1rem 1rem;
+}
+
+@media (max-width: 900px) {
+  .shell-inner {
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .header-start {
+    flex: 1;
+    gap: 0.25rem;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    flex-shrink: 1;
+    gap: 0.4rem;
+
+    .logo-icon {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+  }
+
+  .mobile-nav-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin-right: 0.05rem;
+    padding-top: 0.5rem !important;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .user-area {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .shell-main {
+    max-width: none;
+    padding: 0.9rem 0.7rem 1.1rem;
+  }
+
+  .shell-footer {
+    padding: 0.4rem 0.7rem 0.85rem;
+  }
+}

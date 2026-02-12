@@ -1,0 +1,50 @@
+<div class="tailor-page">
+  <div class="jd-section" *ngIf="showJdForm">
+    <mat-form-field appearance="outline">
+      <mat-label>Job title (optional)</mat-label>
+      <input matInput [(ngModel)]="jobTitle" placeholder="Senior Backend Engineer" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Job description</mat-label>
+      <textarea matInput rows="5" [(ngModel)]="jdText" placeholder="Paste job description here..."></textarea>
+    </mat-form-field>
+    <button mat-raised-button color="primary" (click)="tailorFromJd()" [disabled]="loading || !jdText.trim()">
+      <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+      <span *ngIf="!loading">Tailor Resume</span>
+    </button>
+  </div>
+
+  <div class="alert" *ngIf="alertVisible" [class.success]="alertType === 'success'" [class.error]="alertType === 'error'" [class.warning]="alertType === 'warning'">
+    <span>{{ alertMessage }}</span>
+    <button type="button" class="alert-close" (click)="closeAlert()" aria-label="Close alert">×</button>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <div class="panel-header">
+        <h3>LaTeX</h3>
+        <div class="panel-actions">
+          <button class="pill-btn" mat-stroked-button (click)="showInputs()" *ngIf="!showJdForm">Edit JD</button>
+          <button class="pill-btn" mat-stroked-button (click)="downloadTex()" [disabled]="!latex">Download text</button>
+        </div>
+      </div>
+      <div #latexEditor class="latex-editor" [class.disabled]="loading"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h3>PDF Preview</h3>
+        <div class="panel-actions">
+          <button class="pill-btn" mat-stroked-button color="primary" (click)="renderPdf()" [disabled]="renderLoading || loading || !latex">
+            Render PDF
+          </button>
+        </div>
+      </div>
+      <div class="state" *ngIf="loading || renderLoading">Rendering preview...</div>
+      <iframe *ngIf="!loading && !renderLoading && pdfPreviewUrl" [src]="pdfPreviewUrl"></iframe>
+      <div class="state" *ngIf="!loading && !renderLoading && !pdfPreviewUrl">
+        Add JD text and click Tailor Resume.
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,50 @@
+<div class="account-page">
+  <div class="account-header">
+    <h1>Profile &amp; account</h1>
+    <p>Update your email, password, or delete your account</p>
+  </div>
+
+  <section class="account-card profile-section">
+    <h2 class="profile-heading">
+      <mat-icon>person</mat-icon>
+      Profile
+    </h2>
+    <form (ngSubmit)="onSave()" class="account-form">
+      <mat-form-field appearance="outline" class="full">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" [(ngModel)]="email" name="email" [disabled]="loading" />
+      </mat-form-field>
+
+      <div class="password-section">
+        <h3>Change password</h3>
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Current password</mat-label>
+          <input matInput type="password" [(ngModel)]="currentPassword" name="currentPassword" [disabled]="loading" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>New password</mat-label>
+          <input matInput type="password" [(ngModel)]="newPassword" name="newPassword" [disabled]="loading" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full">
+          <mat-label>Confirm new password</mat-label>
+          <input matInput type="password" [(ngModel)]="confirmNewPassword" name="confirmNewPassword" [disabled]="loading" />
+        </mat-form-field>
+      </div>
+
+      <p class="error-msg" *ngIf="error">{{ error }}</p>
+      <p class="success-msg" *ngIf="success">{{ success }}</p>
+      <button mat-raised-button color="primary" type="submit" class="save-btn" [disabled]="loading">
+        <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+        <span *ngIf="!loading">Save changes</span>
+      </button>
+    </form>
+  </section>
+
+  <section class="account-card danger-section">
+    <h2>Danger zone</h2>
+    <p class="danger-desc">Permanently delete your account and all associated data (resumes, jobs). This cannot be undone.</p>
+    <button mat-stroked-button color="warn" (click)="openDeleteDialog()" [disabled]="loading">
+      Delete account
+    </button>
+  </section>
+</div>

@@ -1,0 +1,278 @@
+@use '@angular/material' as mat;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(165deg, #0f1419 0%, #1a2332 50%, #0f1419 100%);
+  color: #e6edf3;
+}
+
+.header {
+  padding: 1.25rem 1rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.25rem 0;
+}
+
+.logo-icon {
+  width: 1.55rem;
+  height: 1.55rem;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(126, 231, 135, 0.2));
+}
+
+.tagline {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  color: #8b949e;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  button {
+    min-height: 42px;
+    mat-icon {
+      margin-right: 0.35rem;
+      vertical-align: middle;
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+  }
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.start-section {
+  text-align: center;
+  padding: 2rem 1rem;
+
+  .start-hint {
+    color: #8b949e;
+    margin: 0 0 1.5rem 0;
+  }
+
+  .start-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+
+    mat-icon {
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+  }
+
+  .error-msg {
+    color: #f85149;
+    margin-top: 1rem;
+  }
+
+  .loading-spinner {
+    display: block;
+    margin: 1rem auto 0;
+  }
+}
+
+.edit-view {
+  padding: 0.25rem 0;
+}
+
+.section-nav-mobile {
+  display: none;
+  margin-bottom: 1rem;
+
+  .section-select {
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
+.section-tabs {
+  ::ng-deep .mat-mdc-tab-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  ::ng-deep .mat-mdc-tab-labels {
+    flex-wrap: wrap;
+  }
+
+  ::ng-deep .mat-mdc-tab {
+    min-width: auto;
+    padding: 0 0.75rem;
+
+    .mat-mdc-tab-labels & .mdc-tab__text-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+  }
+
+  ::ng-deep .mat-mdc-tab-body-content {
+    padding: 1rem 0;
+  }
+}
+
+.tailor-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.jd-inputs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+
+  button {
+    justify-self: start;
+    position: relative;
+  }
+}
+
+.btn-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tailor-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  min-height: 520px;
+}
+
+.tailor-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.55rem;
+
+  .tailor-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+
+    h3 {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #e6edf3;
+      flex: 1;
+    }
+  }
+
+  iframe {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: none;
+    border-radius: 8px;
+    background: #fff;
+  }
+}
+
+.tailor-state {
+  color: #8b949e;
+  padding: 0.85rem;
+  font-size: 0.85rem;
+}
+
+.tailor-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  background: #0d1117;
+
+  &.disabled {
+    opacity: 0.75;
+    pointer-events: none;
+  }
+}
+
+:host ::ng-deep .tailor-editor .cm-editor {
+  height: 100%;
+  max-width: 100%;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+:host ::ng-deep .tailor-editor .cm-scroller {
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .section-nav-mobile {
+    display: block;
+  }
+
+  .section-tabs ::ng-deep .mat-mdc-tab-header {
+    display: none;
+  }
+
+  .header {
+    padding: 1rem 0.75rem;
+  }
+
+  .logo {
+    font-size: 1.2rem;
+  }
+
+  .header-actions button {
+    padding: 0 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .main {
+    padding: 0.75rem;
+  }
+
+  .tailor-split {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 769px) {
+  .header {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+
+  .main {
+    padding: 1.5rem;
+  }
+
+  .section-tabs ::ng-deep .mat-mdc-tab-body-content {
+    padding: 1.5rem 0;
+  }
+}

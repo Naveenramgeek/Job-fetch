@@ -1,0 +1,74 @@
+<div class="shell">
+  <header class="shell-header">
+    <div class="shell-inner">
+      <div class="header-start">
+        <button class="mobile-nav-btn" mat-icon-button [matMenuTriggerFor]="mobileNavMenu" aria-label="Open navigation menu">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <a class="logo" routerLink="/dashboard">
+          <img class="logo-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+          JobFetch
+        </a>
+      </div>
+      <nav class="nav">
+        <button mat-button routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          Dashboard
+        </button>
+        <button mat-button routerLink="/resume" routerLinkActive="active">Resume</button>
+        <button mat-button routerLink="/tailor-resume" routerLinkActive="active">Tailor Resume</button>
+        <button mat-button routerLink="/account" routerLinkActive="active">Profile</button>
+        <button mat-button *ngIf="auth.currentUserValue?.isAdmin" routerLink="/admin" routerLinkActive="active">
+          Admin
+        </button>
+      </nav>
+      <mat-menu #mobileNavMenu="matMenu" xPosition="before">
+        <button mat-menu-item routerLink="/dashboard">
+          <mat-icon>dashboard</mat-icon>
+          <span>Dashboard</span>
+        </button>
+        <button mat-menu-item routerLink="/resume">
+          <mat-icon>description</mat-icon>
+          <span>Resume</span>
+        </button>
+        <button mat-menu-item routerLink="/tailor-resume">
+          <mat-icon>auto_fix_high</mat-icon>
+          <span>Tailor Resume</span>
+        </button>
+        <button mat-menu-item routerLink="/account">
+          <mat-icon>person</mat-icon>
+          <span>Profile</span>
+        </button>
+        <button mat-menu-item *ngIf="auth.currentUserValue?.isAdmin" routerLink="/admin">
+          <mat-icon>admin_panel_settings</mat-icon>
+          <span>Admin</span>
+        </button>
+      </mat-menu>
+      <div class="user-area">
+        <span class="user-email">{{ auth.currentUserValue?.email }}</span>
+        <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="User menu">
+          <mat-icon>account_circle</mat-icon>
+        </button>
+        <mat-menu #userMenu="matMenu" xPosition="before">
+          <div class="menu-user-info">
+            <strong>{{ auth.currentUserValue?.name }}</strong>
+            <span>{{ auth.currentUserValue?.email }}</span>
+          </div>
+          <button mat-menu-item (click)="goToAccount()">
+            <mat-icon>person</mat-icon>
+            <span>Profile &amp; account</span>
+          </button>
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Sign out</span>
+          </button>
+        </mat-menu>
+      </div>
+    </div>
+  </header>
+  <main class="shell-main">
+    <router-outlet></router-outlet>
+  </main>
+  <footer class="shell-footer">
+    <p class="app-copyright">© 2026 Naveen Vemula. All rights reserved</p>
+  </footer>
+</div>

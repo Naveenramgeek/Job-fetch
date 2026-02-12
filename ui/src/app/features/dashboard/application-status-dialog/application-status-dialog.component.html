@@ -1,0 +1,9 @@
+<h2 mat-dialog-title>Did you apply?</h2>
+<mat-dialog-content>
+  <p>You just visited the job posting for <strong>{{ data.job.title }}</strong> at {{ data.job.company }}. Did you apply?</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="dismiss()">Skip</button>
+  <button mat-stroked-button (click)="select('not_applied')">Not applied</button>
+  <button mat-raised-button color="primary" (click)="select('applied')">Yes, I applied</button>
+</mat-dialog-actions>

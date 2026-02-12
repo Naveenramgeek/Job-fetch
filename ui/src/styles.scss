@@ -1,0 +1,155 @@
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+$dark-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$green-palette,
+  ),
+  typography: (
+    brand-family: 'DM Sans',
+    plain-family: 'DM Sans',
+  ),
+  density: (
+    scale: 0,
+  ),
+));
+
+:root {
+  @include mat.all-component-themes($dark-theme);
+}
+
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  background: #0f1419;
+  color: #e6edf3;
+  overflow-x: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-copyright {
+  color: #8b949e;
+  font-size: 0.82rem;
+  text-align: center;
+  letter-spacing: 0.01em;
+  margin: 1rem 0 0;
+}
+
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: #1a2332;
+  --mdc-snackbar-supporting-text-color: #e6edf3;
+  --mat-snack-bar-button-color: #7ee787;
+}
+
+.mat-mdc-tab-header {
+  --mdc-secondary-navigation-tab-text-color: #8b949e;
+  --mdc-secondary-navigation-tab-indicator-color: #7ee787;
+  --mat-tab-header-active-label-text-color: #e6edf3;
+  --mat-tab-header-active-ripple-color: #7ee787;
+  --mat-tab-header-inactive-ripple-color: #7ee787;
+}
+
+.mat-mdc-raised-button.mat-primary {
+  --mdc-filled-button-container-color: #238636;
+  --mdc-filled-button-label-text-color: #fff;
+  &:hover {
+    --mdc-filled-button-container-color: #2ea043;
+  }
+}
+
+.mat-mdc-outlined-button {
+  --mdc-outlined-button-outline-color: rgba(126, 231, 135, 0.5);
+  --mdc-outlined-button-label-text-color: #7ee787;
+  &:hover {
+    --mdc-outlined-button-outline-color: #7ee787;
+    --mdc-outlined-button-label-text-color: #9eea9e;
+  }
+}
+
+.mat-mdc-form-field.mat-focused .mdc-notched-outline .mdc-notched-outline__leading,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline .mdc-notched-outline__notch,
+.mat-mdc-form-field.mat-focused .mdc-notched-outline .mdc-notched-outline__trailing {
+  border-color: #7ee787 !important;
+}
+
+.mat-mdc-form-field.mat-focused .mat-mdc-floating-label.mdc-floating-label {
+  color: #7ee787 !important;
+}
+
+.mat-mdc-input-element::placeholder {
+  color: #6e7681;
+}
+
+/* Enforce 48px touch targets for accessibility and mobile (Material Design minimum) */
+.mat-mdc-icon-button {
+  width: 48px !important;
+  height: 48px !important;
+  padding: 0 !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  position: relative;
+
+  .mat-mdc-button-touch-target {
+    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 48px !important;
+    height: 48px !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .mdc-icon-button__icon,
+  mat-icon {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 24px !important;
+  }
+}
+
+.mat-mdc-button,
+.mat-mdc-raised-button,
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button {
+  min-height: 48px !important;
+  padding: 0 16px !important;
+  position: relative;
+
+  .mat-mdc-button-touch-target {
+    display: block !important;
+    min-height: 48px !important;
+    height: 48px !important;
+  }
+}
+
+.mat-icon-button.mat-warn,
+.mat-mdc-icon-button.mat-warn {
+  --mdc-icon-button-icon-color: #f85149;
+  &:hover {
+    --mdc-icon-button-icon-color: #ff7b72;
+  }
+}
+
+.mat-mdc-progress-spinner {
+  --mdc-circular-progress-active-indicator-color: #7ee787;
+}

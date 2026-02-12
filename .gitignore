@@ -1,0 +1,29 @@
+# Secrets and local env files
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
+venv/
+.venv/
+
+# Node / Angular
+node_modules/
+ui/dist/
+ui/.angular/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/

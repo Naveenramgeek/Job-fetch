@@ -1,0 +1,32 @@
+<div class="section-card" [@sectionEnter]>
+  <h2 class="section-title">Skills</h2>
+  <p class="section-desc">Skills by category. Edit category names and items.</p>
+  <div class="skill-group" *ngFor="let g of groups; let gi = index; trackBy: trackByKey" [@itemEnter]>
+    <div class="group-header">
+      <mat-form-field appearance="outline" class="group-name">
+        <mat-label>Category</mat-label>
+        <input matInput [ngModel]="g.key" (ngModelChange)="renameGroup(g.key, $event)" placeholder="e.g. Languages"  />
+      </mat-form-field>
+      <button mat-icon-button type="button" (click)="removeGroup(g.key)" color="warn" matTooltip="Remove category">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+    <div class="skill-chips">
+      <ng-container *ngFor="let s of g.values; let si = index">
+        <mat-form-field appearance="outline" class="chip-field">
+          <input matInput [(ngModel)]="g.values[si]" placeholder="Skill" />
+        </mat-form-field>
+        <button mat-icon-button type="button" (click)="removeSkill(g.values, si)" color="warn">
+          <mat-icon>close</mat-icon>
+        </button>
+      </ng-container>
+      <button mat-stroked-button type="button" (click)="addSkill(g.values)">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
+  </div>
+  <button mat-raised-button color="primary" type="button" (click)="addGroup()" class="add-top">
+    <mat-icon>add</mat-icon>
+    Add category
+  </button>
+</div>

@@ -1,0 +1,72 @@
+<div class="landing">
+  <div class="landing-bg">
+    <div class="gradient-orb orb-1"></div>
+    <div class="gradient-orb orb-2"></div>
+    <div class="gradient-orb orb-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <header class="landing-header" @heroEnter>
+    <div class="logo">
+      <img class="logo-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+      <span>JobFetch</span>
+    </div>
+    <nav class="header-actions">
+      <button mat-button (click)="goToLogin()">Log in</button>
+      <button mat-raised-button color="primary" (click)="goToSignup()">Sign up</button>
+    </nav>
+  </header>
+
+  <section class="hero" @heroEnter>
+    <h1 class="hero-title">
+      <span class="hero-highlight">Job hunting</span> just got smarter
+    </h1>
+    <p class="hero-subtitle">
+      AI matches your resume to real jobs. Upload once, get tailored listings, and track your applications—all in one place.
+    </p>
+    <div class="hero-cta">
+      <button mat-raised-button color="primary" class="cta-primary" (click)="goToSignup()">
+        <mat-icon>rocket_launch</mat-icon>
+        Get started free
+      </button>
+      <button mat-stroked-button class="cta-secondary" (click)="goToLogin()">
+        I already have an account
+      </button>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2 class="section-title" @floatEnter>Why JobFetch?</h2>
+    <p class="section-desc" @floatEnter>Built for job seekers who want results, not noise.</p>
+    <div class="feature-grid">
+      <div
+        *ngFor="let f of features"
+        class="feature-card"
+        @floatEnter
+      >
+        <div class="feature-icon">
+          <mat-icon>{{ f.icon }}</mat-icon>
+        </div>
+        <h3>{{ f.title }}</h3>
+        <p>{{ f.desc }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section" @floatEnter>
+    <h2>Ready to land your next role?</h2>
+    <p>Join JobFetch today. It's free.</p>
+    <div class="cta-buttons">
+      <button mat-raised-button color="primary" (click)="goToSignup()">Create account</button>
+      <button mat-stroked-button (click)="goToLogin()">Log in</button>
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <span class="logo-footer">
+      <img class="logo-footer-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+      JobFetch
+    </span>
+    <p class="app-copyright">© 2026 Naveen Vemula. All rights reserved</p>
+  </footer>
+</div>

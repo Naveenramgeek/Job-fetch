@@ -1,0 +1,18 @@
+.custom-block {
+  margin-bottom: 1.25rem;
+}
+
+.custom-fields-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+
+  .full {
+    width: 100%;
+  }
+}
+
+.custom-content-field {
+  margin-top: 0.25rem;
+}
