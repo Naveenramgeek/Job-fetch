@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal, ensure_tables_exist
 from app.repos.search_category_repo import seed_default_categories
 from app.repos.job_listing_repo import delete_unmatched as delete_unmatched_job_listings
 from app.services.job_collector import run_collector
@@ -26,7 +26,7 @@ INTERVAL_SECONDS = settings.pipeline_interval_seconds
 
 def run_pipeline(db: Session) -> dict:
     """Run collector + deep match. Returns combined stats."""
-    init_db()
+    ensure_tables_exist()
     seed_default_categories(db)
 
     collector_result = run_collector(db)
@@ -46,7 +46,7 @@ def main():
     parser.add_argument("--collect-only", action="store_true", help="Only run collector, skip deep match")
     args = parser.parse_args()
 
-    init_db()
+    ensure_tables_exist()
     db = SessionLocal()
     try:
         seed_default_categories(db)

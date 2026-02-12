@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 from app.config import settings
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal, ensure_tables_exist
 from app.repos.search_category_repo import seed_default_categories
 from app.repos.job_listing_repo import delete_unmatched as delete_unmatched_job_listings
 from app.services.job_collector import run_collector
@@ -28,7 +28,7 @@ _next_run: datetime | None = None
 
 def _run_pipeline_once() -> dict:
     """Run collector + deep match once. Uses its own DB session. Call from scheduler thread."""
-    init_db()
+    ensure_tables_exist()
     db = SessionLocal()
     try:
         seed_default_categories(db)

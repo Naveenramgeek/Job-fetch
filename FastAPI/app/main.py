@@ -17,7 +17,7 @@ from parser.resume_parser import build_resume_object
 
 from app.config import settings
 from app.core.rate_limiter import rate_limiter
-from app.database import init_db, engine
+from app.database import ensure_tables_exist, engine
 from app.dependencies import get_current_user_full_access
 from app.logging_config import setup_logging
 from app.routers import admin, auth, resume, jobs
@@ -113,7 +113,7 @@ def on_startup():
             logger.warning("SECRET_KEY is using placeholder default. Set SECRET_KEY in .env for secure deployments.")
         if "username:password@" in settings.database_url:
             logger.warning("DATABASE_URL appears to use placeholder credentials. Set DATABASE_URL in .env.")
-    init_db()
+    ensure_tables_exist()
 
 
 @app.get("/")

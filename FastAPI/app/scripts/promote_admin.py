@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.database import SessionLocal, init_db
+from app.database import SessionLocal, ensure_tables_exist
 from app.repos.user_repo import get_by_email, update
 
 
@@ -16,7 +16,7 @@ def main():
         print("Usage: python -m app.scripts.promote_admin <email>")
         sys.exit(1)
     email = sys.argv[1].strip()
-    init_db()
+    ensure_tables_exist()
     db = SessionLocal()
     try:
         user = get_by_email(db, email)
