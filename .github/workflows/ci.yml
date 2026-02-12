@@ -17,6 +17,7 @@ jobs:
       DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ci_db
       SECRET_KEY: ci-secret-key
       APP_ENV: development
+      PYTHONPATH: ${{ github.workspace }}/FastAPI
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +35,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests with coverage gate
-        run: pytest
+        run: python -m pytest
 
       - name: Upload coverage xml
         if: always()
