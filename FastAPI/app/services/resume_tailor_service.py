@@ -416,6 +416,11 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
     if not cert_lines:
         cert_lines = [r"\item N/A"]
 
+    exp_content = chr(10).join(exp_blocks) if exp_blocks else r"\item \small{No experience entries available.}"
+    proj_content = chr(10).join(proj_blocks) if proj_blocks else r"\item \small{No project entries available.}"
+    edu_content = chr(10).join(edu_blocks) if edu_blocks else r"\item \small{No education entries available.}"
+    cert_content = chr(10).join(cert_lines)
+
     return rf"""{LATEX_PREAMBLE}
 
 \begin{{document}}
@@ -430,17 +435,17 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
 
 \section{{Work Experience}}
 \begin{{itemize}}[leftmargin=0in, label={{}}]
-{chr(10).join(exp_blocks) if exp_blocks else r"\item \small{No experience entries available.}"}
+{exp_content}
 \end{{itemize}}
 
 \section{{Projects}}
 \begin{{itemize}}[leftmargin=0in, label={{}}]
-{chr(10).join(proj_blocks) if proj_blocks else r"\item \small{No project entries available.}"}
+{proj_content}
 \end{{itemize}}
 
 \section{{Education}}
 \begin{{itemize}}[leftmargin=0in, label={{}}]
-{chr(10).join(edu_blocks) if edu_blocks else r"\item \small{No education entries available.}"}
+{edu_content}
 \end{{itemize}}
 
 \section{{Technical Skills}}
@@ -458,7 +463,7 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
 
 \section{{Certifications}}
 \begin{{itemize}}[leftmargin=0.15in]
-{chr(10).join(cert_lines)}
+{cert_content}
 \end{{itemize}}
 
 \end{{document}}
