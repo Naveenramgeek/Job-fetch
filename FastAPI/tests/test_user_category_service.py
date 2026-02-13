@@ -86,17 +86,13 @@ def test_assign_user_category_uses_latest_resume_when_none(monkeypatch):
     assert out == "software_engineer"
 
 
-def test_assign_user_category_handles_llm_assign_exception(monkeypatch):
+def test_assign_user_category_unknown_title_returns_none(monkeypatch):
     cats = [_Cat("c1", "software_engineer"), _Cat("c2", "data_scientist")]
     monkeypatch.setattr(ucs, "get_all", lambda db: cats)
     monkeypatch.setattr(ucs, "is_llm_enabled", lambda: True)
-    monkeypatch.setattr(ucs, "llm_assign_category_call", lambda title, slugs: (_ for _ in ()).throw(RuntimeError("llm")))
-    monkeypatch.setattr(ucs, "llm_suggest_slug_call", lambda title: ("custom_slug", "Custom Slug"))
-    monkeypatch.setattr(ucs, "get_by_slug", lambda db, slug: None)
-    monkeypatch.setattr(ucs, "create_category", lambda db, slug, display_name: _Cat("c9", slug))
-    monkeypatch.setattr(ucs, "update", lambda db, user_id, **kwargs: None)
+    monkeypatch.setattr(ucs, "update", lambda db, user_id, **kwargs: (_ for _ in ()).throw(RuntimeError("must not update")))
     out = ucs.assign_user_category(db=object(), user_id="u1", resume_data={"contact": {"title": "Unknown Role"}})
-    assert out == "custom_slug"
+    assert out is None
 
 
 def test_assign_user_category_returns_none_when_no_category_created(monkeypatch):
