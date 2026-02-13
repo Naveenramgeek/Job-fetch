@@ -122,3 +122,51 @@ def run_deep_match_all(db: Session) -> dict:
         total["jobs"] += r["jobs"]
         total["scored"] += r["scored"]
     return total
+
+
+def run_deep_match_for_user(db: Session, user_id: str, since_hours: int = SINCE_HOURS) -> dict:
+    """
+    Run deep match only for one user, against jobs in the user's category.
+    Useful for onboarding bootstrap runs without changing global scheduler behavior.
+    """
+    from app.repos.user_repo import get_by_id as get_user_by_id
+
+    user = get_user_by_id(db, user_id)
+    if not user or not user.search_category_id:
+        logger.info("Deep match for user skipped: missing user/category user_id=%s", user_id)
+        return {"users": 0, "jobs": 0, "scored": 0}
+
+    jobs = get_jobs_by_category_since(db, user.search_category_id, since_hours=since_hours)
+    if not jobs:
+        return {"users": 1, "jobs": 0, "scored": 0}
+
+    resume = get_latest_by_user(db, user.id)
+    resume_data = resume.parsed_data if resume and resume.parsed_data else {}
+    scored = 0
+    skipped_existing = 0
+    skipped_low = 0
+
+    for job in jobs:
+        if get_existing_match(db, user.id, job.id):
+            skipped_existing += 1
+            continue
+        result = _score_pair(resume_data, job.title or "", job.description or "")
+        score = result["match_score"]
+        if result.get("hard_gate_blocked") or score <= MATCH_THRESHOLD:
+            skipped_low += 1
+            continue
+        create_match(
+            db,
+            user_id=user.id,
+            job_listing_id=job.id,
+            match_score=score,
+            match_reason=result.get("match_reason"),
+            resume_years_experience=result.get("resume_years_experience"),
+        )
+        scored += 1
+
+    logger.info(
+        "Deep match user %s: jobs=%d scored=%d skipped_existing=%d skipped_low=%d",
+        user.id, len(jobs), scored, skipped_existing, skipped_low,
+    )
+    return {"users": 1, "jobs": len(jobs), "scored": scored}

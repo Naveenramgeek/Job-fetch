@@ -62,3 +62,37 @@ def test_run_collector_dedupes_and_batches_by_category(monkeypatch):
     assert out["total_deduped"] == 2
     assert out["inserted"] == 2
     assert sorted(called) == [("c1", 1), ("c2", 1)]
+
+
+def test_run_collector_with_category_override_and_fetch_window(monkeypatch):
+    cats = [_Category("c1", "software_engineer")]
+    monkeypatch.setattr(jc, "get_category_by_id", lambda db, cid: cats[0] if cid == "c1" else None)
+    captured = {}
+
+    def fake_fetch(slug, cid, results_wanted=None, hours_old=None):
+        captured["wanted"] = results_wanted
+        captured["hours"] = hours_old
+        return [{"title": "A", "company": "X", "job_url": "u1", "search_category_id": "c1"}]
+
+    monkeypatch.setattr(jc, "_fetch_for_category", fake_fetch)
+    monkeypatch.setattr(jc, "batch_upsert", lambda db, rows, cid: len(rows))
+    out = jc.run_collector(db=object(), category_ids=["c1"], results_wanted=200, hours_old=10)
+    assert out["categories"] == 1
+    assert out["inserted"] == 1
+    assert captured["wanted"] == 200
+    assert captured["hours"] == 10
+
+
+def test_run_collector_with_invalid_category_override_returns_zero(monkeypatch):
+    monkeypatch.setattr(jc, "get_category_by_id", lambda db, cid: None)
+    out = jc.run_collector(db=object(), category_ids=["missing"])
+    assert out == {"total_fetched": 0, "total_deduped": 0, "inserted": 0, "categories": 0}
+
+
+def test_run_collector_handles_thread_fetch_exception(monkeypatch):
+    cats = [_Category("c1", "software_engineer")]
+    monkeypatch.setattr(jc, "get_categories_with_active_users", lambda db: cats)
+    monkeypatch.setattr(jc, "_fetch_for_category", lambda slug, cid: (_ for _ in ()).throw(RuntimeError("boom")))
+    out = jc.run_collector(db=object())
+    assert out["total_fetched"] == 0
+    assert out["categories"] == 1
