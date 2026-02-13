@@ -293,7 +293,7 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
         .map((v) => v.trim())
         .filter(Boolean);
       if (vals.length) {
-        groups.Skills = [...(groups.Skills || []), ...vals];
+        groups['Skills'] = [...(groups['Skills'] || []), ...vals];
       }
     }
 
