@@ -165,4 +165,62 @@ def test_new_user_bootstrap_pipeline_runs_collector_and_match(monkeypatch):
     resume_mod._run_new_user_bootstrap_pipeline("u1")
     assert called["collector"] is True
     assert called["match"] is True
+
+
+def test_update_latest_resume_skips_immediate_matching_when_no_category(monkeypatch, client):
+    class _Resume:
+        id = "r1"
+        user_id = "user-1"
+        parsed_data = {"summary": "x"}
+
+    called = []
+    monkeypatch.setattr(resume_mod, "get_latest_by_user", lambda db, uid: _Resume())
+    monkeypatch.setattr(resume_mod, "update_resume", lambda db, rid, uid, data: _Resume())
+    monkeypatch.setattr(resume_mod, "assign_user_category", lambda db, uid, resume_data: None)
+    monkeypatch.setattr(resume_mod, "_trigger_immediate_matching", lambda user_id: called.append(user_id))
+
+    resp = client.put("/resumes/latest", json={"parsed_data": {"summary": "updated"}})
+    assert resp.status_code == 200
+    assert called == []
+
+
+def test_trigger_immediate_matching_closes_db_session(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    db = _DB()
+    seen = []
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        resume_mod,
+        "run_deep_match_for_user",
+        lambda _db, user_id: seen.append((_db, user_id)) or {"scored": 1},
+    )
+
+    resume_mod._trigger_immediate_matching("user-1")
+    assert seen == [(db, "user-1")]
+    assert db.closed is True
+
+
+def test_trigger_immediate_matching_swallows_errors_and_closes_db(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    db = _DB()
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        resume_mod,
+        "run_deep_match_for_user",
+        lambda _db, _user_id: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    resume_mod._trigger_immediate_matching("user-1")
     assert db.closed is True

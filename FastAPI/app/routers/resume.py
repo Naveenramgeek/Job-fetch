@@ -45,6 +45,18 @@ def _run_new_user_bootstrap_pipeline(user_id: str) -> None:
         db.close()
 
 
+def _trigger_immediate_matching(user_id: str) -> None:
+    """Best-effort immediate deep match for newly onboarded/updated users."""
+    db = SessionLocal()
+    try:
+        result = run_deep_match_for_user(db, user_id)
+        logger.info("Immediate matching finished for user=%s: %s", user_id, result)
+    except Exception as e:
+        logger.exception("Immediate matching failed for user=%s: %s", user_id, e)
+    finally:
+        db.close()
+
+
 @router.get("/latest", response_model=ResumeResponse)
 def get_latest_resume(
     db: Session = Depends(get_db),
@@ -81,6 +93,7 @@ def save_resume(
 @router.put("/latest", response_model=ResumeResponse)
 def update_latest_resume(
     data: ResumeUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user_full_access),
 ):
@@ -91,7 +104,9 @@ def update_latest_resume(
         resume = update_resume(db, latest.id, user.id, data.parsed_data)
         logger.info("Resume updated for user %s", user.id)
         try:
-            assign_user_category(db, user.id, resume_data=data.parsed_data)
+            assigned_slug = assign_user_category(db, user.id, resume_data=data.parsed_data)
+            if assigned_slug:
+                background_tasks.add_task(_trigger_immediate_matching, user.id)
         except Exception as e:
             logger.warning("Resume updated but category assignment failed for user=%s: %s", user.id, e)
         return resume
