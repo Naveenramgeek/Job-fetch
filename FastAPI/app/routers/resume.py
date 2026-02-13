@@ -1,18 +1,31 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 
 logger = logging.getLogger(__name__)
 from app.dependencies import get_current_user_full_access
 from app.models.user import User
 from app.schemas.resume import ResumeCreate, ResumeUpdate, ResumeResponse
 from app.repos.resume_repo import create as create_resume, get_latest_by_user, update as update_resume
+from app.services.deep_match_service import run_deep_match_for_user
 from app.services.user_category_service import assign_user_category
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
+
+
+def _trigger_immediate_matching(user_id: str) -> None:
+    """Best-effort immediate deep match for newly onboarded/updated users."""
+    db = SessionLocal()
+    try:
+        result = run_deep_match_for_user(db, user_id)
+        logger.info("Immediate matching finished for user=%s: %s", user_id, result)
+    except Exception as e:
+        logger.exception("Immediate matching failed for user=%s: %s", user_id, e)
+    finally:
+        db.close()
 
 
 @router.get("/latest", response_model=ResumeResponse)
@@ -29,6 +42,7 @@ def get_latest_resume(
 @router.post("", response_model=ResumeResponse)
 def save_resume(
     data: ResumeCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user_full_access),
 ):
@@ -36,7 +50,9 @@ def save_resume(
         resume = create_resume(db, user.id, data.parsed_data)
         logger.info("Resume saved for user %s", user.id)
         try:
-            assign_user_category(db, user.id, resume_data=data.parsed_data)
+            assigned_slug = assign_user_category(db, user.id, resume_data=data.parsed_data)
+            if assigned_slug:
+                background_tasks.add_task(_trigger_immediate_matching, user.id)
         except Exception as e:
             logger.warning("Resume saved but category assignment failed for user=%s: %s", user.id, e)
         return resume
@@ -48,6 +64,7 @@ def save_resume(
 @router.put("/latest", response_model=ResumeResponse)
 def update_latest_resume(
     data: ResumeUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user_full_access),
 ):
@@ -58,7 +75,9 @@ def update_latest_resume(
         resume = update_resume(db, latest.id, user.id, data.parsed_data)
         logger.info("Resume updated for user %s", user.id)
         try:
-            assign_user_category(db, user.id, resume_data=data.parsed_data)
+            assigned_slug = assign_user_category(db, user.id, resume_data=data.parsed_data)
+            if assigned_slug:
+                background_tasks.add_task(_trigger_immediate_matching, user.id)
         except Exception as e:
             logger.warning("Resume updated but category assignment failed for user=%s: %s", user.id, e)
         return resume

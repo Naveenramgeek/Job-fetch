@@ -88,3 +88,78 @@ def test_update_latest_resume_not_found(monkeypatch, client):
     monkeypatch.setattr(resume_mod, "get_latest_by_user", lambda db, uid: None)
     resp = client.put("/resumes/latest", json={"parsed_data": {"summary": "updated"}})
     assert resp.status_code == 404
+
+
+def test_save_resume_triggers_immediate_matching_when_category_assigned(monkeypatch, client):
+    class _Resume:
+        id = "r1"
+        user_id = "user-1"
+        parsed_data = {"summary": "x"}
+
+    called = []
+    monkeypatch.setattr(resume_mod, "create_resume", lambda db, uid, data: _Resume())
+    monkeypatch.setattr(resume_mod, "assign_user_category", lambda db, uid, resume_data: "software_engineer")
+    monkeypatch.setattr(resume_mod, "_trigger_immediate_matching", lambda user_id: called.append(user_id))
+
+    resp = client.post("/resumes", json={"parsed_data": {"summary": "x"}})
+    assert resp.status_code == 200
+    assert called == ["user-1"]
+
+
+def test_update_latest_resume_skips_immediate_matching_when_no_category(monkeypatch, client):
+    class _Resume:
+        id = "r1"
+        user_id = "user-1"
+        parsed_data = {"summary": "x"}
+
+    called = []
+    monkeypatch.setattr(resume_mod, "get_latest_by_user", lambda db, uid: _Resume())
+    monkeypatch.setattr(resume_mod, "update_resume", lambda db, rid, uid, data: _Resume())
+    monkeypatch.setattr(resume_mod, "assign_user_category", lambda db, uid, resume_data: None)
+    monkeypatch.setattr(resume_mod, "_trigger_immediate_matching", lambda user_id: called.append(user_id))
+
+    resp = client.put("/resumes/latest", json={"parsed_data": {"summary": "updated"}})
+    assert resp.status_code == 200
+    assert called == []
+
+
+def test_trigger_immediate_matching_closes_db_session(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    db = _DB()
+    seen = []
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        resume_mod,
+        "run_deep_match_for_user",
+        lambda _db, user_id: seen.append((_db, user_id)) or {"scored": 1},
+    )
+
+    resume_mod._trigger_immediate_matching("user-1")
+    assert seen == [(db, "user-1")]
+    assert db.closed is True
+
+
+def test_trigger_immediate_matching_swallows_errors_and_closes_db(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    db = _DB()
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        resume_mod,
+        "run_deep_match_for_user",
+        lambda _db, _user_id: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    resume_mod._trigger_immediate_matching("user-1")
+    assert db.closed is True
