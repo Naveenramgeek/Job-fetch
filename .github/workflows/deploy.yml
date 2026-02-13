@@ -1,6 +1,8 @@
 name: Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -14,9 +16,12 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Server
+    name: Deploy Backend to Server
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || 'production' }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +45,7 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
 
-      - name: Deploy over SSH
+      - name: Deploy backend over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -53,19 +58,13 @@ jobs:
             git checkout main
             git pull origin main
 
-            # Backend
-            python3 -m venv venv || true
-            source venv/bin/activate
-            pip install -r FastAPI/requirements.txt
+            # Backend only. This does not delete untracked files (like .env).
+            cd FastAPI
+            python3 -m venv .venv || true
+            source .venv/bin/activate
+            pip install -r requirements.txt
 
-            # Frontend
-            cd ui
-            npm ci
-            npm run build
-            cd ..
-
-            # TODO: Replace with your process manager commands
-            # Example (systemd):
-            # sudo systemctl restart jobfetch-api
-            # sudo systemctl restart nginx
-            echo "Deployment script completed."
+            # Restart API service if configured on server.
+            # Ensure deploy user has permissions for this command.
+            sudo systemctl restart jobfetch-api
+            echo "Backend deployment completed."

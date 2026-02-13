@@ -3,6 +3,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.user import User
+from app.repos.user_repo import get_by_id
 from app.repos.user_repo import get_users_by_category
 from app.repos.job_listing_repo import get_jobs_by_category_since
 from app.repos.resume_repo import get_latest_by_user
@@ -48,6 +50,56 @@ def _log_score_distribution(scores: list[float], category_id: str) -> None:
     )
 
 
+def _score_user_against_jobs(db: Session, user: User, jobs: list[Any]) -> dict[str, Any]:
+    """Score one user against candidate jobs and create matches above threshold."""
+    resume = get_latest_by_user(db, user.id)
+    resume_data = resume.parsed_data if resume and resume.parsed_data else {}
+    scored = 0
+    skipped_existing = 0
+    skipped_low = 0
+    scores: list[float] = []
+    low_score_samples: list[tuple[str, float]] = []
+
+    for job in jobs:
+        if get_existing_match(db, user.id, job.id):
+            skipped_existing += 1
+            continue
+        result = _score_pair(
+            resume_data,
+            job.title or "",
+            job.description or "",
+        )
+        score = result["match_score"]
+        scores.append(score)
+        if result.get("hard_gate_blocked"):
+            skipped_low += 1
+            if len(low_score_samples) < 5:
+                low_score_samples.append((job.title or "Unknown", score))
+            continue
+        if score <= MATCH_THRESHOLD:
+            skipped_low += 1
+            if len(low_score_samples) < 5:
+                low_score_samples.append((job.title or "Unknown", score))
+            continue
+        create_match(
+            db,
+            user_id=user.id,
+            job_listing_id=job.id,
+            match_score=score,
+            match_reason=result.get("match_reason"),
+            resume_years_experience=result.get("resume_years_experience"),
+        )
+        scored += 1
+
+    return {
+        "scored": scored,
+        "skipped_existing": skipped_existing,
+        "skipped_low": skipped_low,
+        "scores": scores,
+        "low_score_samples": low_score_samples,
+    }
+
+
 def run_deep_match_for_category(db: Session, search_category_id: str) -> dict:
     """
     For a category: get users + jobs from last 2h. Score all user-job pairs.
@@ -66,38 +118,14 @@ def run_deep_match_for_category(db: Session, search_category_id: str) -> dict:
     all_scores: list[float] = []
     low_score_samples: list[tuple[str, float]] = []  # (job_title, score) for logging
     for user in users:
-        resume = get_latest_by_user(db, user.id)
-        resume_data = resume.parsed_data if resume and resume.parsed_data else {}
-        for job in jobs:
-            if get_existing_match(db, user.id, job.id):
-                skipped_existing += 1
-                continue
-            result = _score_pair(
-                resume_data,
-                job.title or "",
-                job.description or "",
-            )
-            score = result["match_score"]
-            all_scores.append(score)
-            if result.get("hard_gate_blocked"):
-                skipped_low += 1
-                if len(low_score_samples) < 5:
-                    low_score_samples.append((job.title or "Unknown", score))
-                continue
-            if score <= MATCH_THRESHOLD:
-                skipped_low += 1
-                if len(low_score_samples) < 5:  # Log up to 5 sample low scores
-                    low_score_samples.append((job.title or "Unknown", score))
-                continue
-            create_match(
-                db,
-                user_id=user.id,
-                job_listing_id=job.id,
-                match_score=score,
-                match_reason=result.get("match_reason"),
-                resume_years_experience=result.get("resume_years_experience"),
-            )
-            scored += 1
+        user_result = _score_user_against_jobs(db, user, jobs)
+        scored += user_result["scored"]
+        skipped_existing += user_result["skipped_existing"]
+        skipped_low += user_result["skipped_low"]
+        all_scores.extend(user_result["scores"])
+        if len(low_score_samples) < 5:
+            remaining = 5 - len(low_score_samples)
+            low_score_samples.extend(user_result["low_score_samples"][:remaining])
 
     _log_score_distribution(all_scores, search_category_id)
     if low_score_samples:
@@ -108,6 +136,52 @@ def run_deep_match_for_category(db: Session, search_category_id: str) -> dict:
         search_category_id, scored, skipped_existing, skipped_low,
     )
     return {"users": len(users), "jobs": len(jobs), "scored": scored}
+
+
+def run_deep_match_for_user(db: Session, user_id: str, since_hours: int = SINCE_HOURS) -> dict:
+    """Run deep matching immediately for one user against recent jobs in their category."""
+    user = get_by_id(db, user_id)
+    if not user:
+        return {"user_id": user_id, "jobs": 0, "scored": 0, "reason": "user_not_found"}
+    if not user.is_active:
+        return {"user_id": user_id, "jobs": 0, "scored": 0, "reason": "user_inactive"}
+    if not user.search_category_id:
+        return {"user_id": user_id, "jobs": 0, "scored": 0, "reason": "missing_search_category"}
+
+    jobs = get_jobs_by_category_since(db, user.search_category_id, since_hours=since_hours)
+    if not jobs:
+        logger.debug("Immediate deep match user=%s category=%s: no recent jobs", user_id, user.search_category_id)
+        return {
+            "user_id": user_id,
+            "category_id": user.search_category_id,
+            "jobs": 0,
+            "scored": 0,
+            "skipped_existing": 0,
+            "skipped_low": 0,
+        }
+
+    user_result = _score_user_against_jobs(db, user, jobs)
+    _log_score_distribution(user_result["scores"], user.search_category_id)
+    if user_result["low_score_samples"]:
+        samples_str = ", ".join(f"{t[:40]!r}={s:.1f}" for t, s in user_result["low_score_samples"])
+        logger.info("Immediate deep match low-score samples (threshold=%d): %s", MATCH_THRESHOLD, samples_str)
+    logger.info(
+        "Immediate deep match user=%s category=%s: jobs=%d scored=%d skipped_existing=%d skipped_low=%d",
+        user_id,
+        user.search_category_id,
+        len(jobs),
+        user_result["scored"],
+        user_result["skipped_existing"],
+        user_result["skipped_low"],
+    )
+    return {
+        "user_id": user_id,
+        "category_id": user.search_category_id,
+        "jobs": len(jobs),
+        "scored": user_result["scored"],
+        "skipped_existing": user_result["skipped_existing"],
+        "skipped_low": user_result["skipped_low"],
+    }
 
 
 def run_deep_match_all(db: Session) -> dict:

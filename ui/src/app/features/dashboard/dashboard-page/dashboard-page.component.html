@@ -4,12 +4,22 @@
     <p>Your tracked jobs and tailored resumes</p>
   </div>
 
+  <div class="onboarding-hint">
+    <mat-icon>info</mat-icon>
+    <p *ngIf="auth.currentUserValue?.hasResume">
+      New here? Job matches can take up to 15 minutes after you upload your resume.
+    </p>
+    <p *ngIf="!auth.currentUserValue?.hasResume">
+      To get matched jobs, please upload your resume first. Once uploaded, your first matches can take up to 15 minutes to appear.
+    </p>
+  </div>
+
   <div class="resume-cta" *ngIf="!auth.currentUserValue?.hasResume">
     <div class="cta-content">
       <mat-icon>description</mat-icon>
       <div>
         <strong>No resume yet</strong>
-        <span>Add your resume to get matched with jobs.</span>
+        <span>Please upload your resume to start receiving matched jobs.</span>
       </div>
       <button mat-raised-button color="primary" (click)="goToResume()">
         <mat-icon>add</mat-icon>
