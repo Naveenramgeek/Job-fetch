@@ -89,6 +89,12 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.loadJobs();
   }
 
+  showOnboardingHint(): boolean {
+    const hasResume = !!this.auth.currentUserValue?.hasResume;
+    if (!hasResume) return true;
+    return this.pendingTotal === 0 && this.appliedTotal === 0;
+  }
+
   matchScorePercent(job: JobListing): string {
     if (job.matchScore == null) return '';
     return Math.round(job.matchScore * 100) + '% match';

@@ -3,17 +3,17 @@
   <p class="section-desc">Review and correct contact details.</p>
   <div class="form-grid">
     <mat-form-field appearance="outline" class="full">
-      <mat-label>Name</mat-label>
-      <input matInput [(ngModel)]="contact.name" placeholder="Full name" />
+      <mat-label>Name *</mat-label>
+      <input matInput [(ngModel)]="contact.name" placeholder="Full name" required />
     </mat-form-field>
     <mat-form-field appearance="outline" class="full" floatLabel="always">
-      <mat-label>Professional title</mat-label>
-      <input matInput [(ngModel)]="contact.title" placeholder="e.g. Software Engineer, Senior DevOps Engineer" />
+      <mat-label>Professional title *</mat-label>
+      <input matInput [(ngModel)]="contact.title" placeholder="e.g. Software Engineer, Senior DevOps Engineer" required />
       <mat-hint>Jobs will be fetched based on this title.</mat-hint>
     </mat-form-field>
     <mat-form-field appearance="outline" class="full">
-      <mat-label>Email</mat-label>
-      <input matInput type="email" [(ngModel)]="contact.email" placeholder="email@example.com" />
+      <mat-label>Email *</mat-label>
+      <input matInput type="email" [(ngModel)]="contact.email" placeholder="email@example.com" required />
     </mat-form-field>
     <mat-form-field appearance="outline" class="full">
       <mat-label>Phone</mat-label>

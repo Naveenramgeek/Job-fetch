@@ -90,20 +90,81 @@ def test_update_latest_resume_not_found(monkeypatch, client):
     assert resp.status_code == 404
 
 
-def test_save_resume_triggers_immediate_matching_when_category_assigned(monkeypatch, client):
+def test_save_resume_triggers_bootstrap_when_category_assigned(monkeypatch, client):
     class _Resume:
         id = "r1"
         user_id = "user-1"
         parsed_data = {"summary": "x"}
 
-    called = []
+    called = {"ok": False}
     monkeypatch.setattr(resume_mod, "create_resume", lambda db, uid, data: _Resume())
     monkeypatch.setattr(resume_mod, "assign_user_category", lambda db, uid, resume_data: "software_engineer")
-    monkeypatch.setattr(resume_mod, "_trigger_immediate_matching", lambda user_id: called.append(user_id))
-
+    monkeypatch.setattr(resume_mod, "_run_new_user_bootstrap_pipeline", lambda uid: called.update(ok=True))
     resp = client.post("/resumes", json={"parsed_data": {"summary": "x"}})
     assert resp.status_code == 200
-    assert called == ["user-1"]
+    assert called["ok"] is True
+
+
+def test_save_resume_skips_bootstrap_when_no_category_assigned(monkeypatch, client):
+    class _Resume:
+        id = "r1"
+        user_id = "user-1"
+        parsed_data = {"summary": "x"}
+
+    monkeypatch.setattr(resume_mod, "create_resume", lambda db, uid, data: _Resume())
+    monkeypatch.setattr(resume_mod, "assign_user_category", lambda db, uid, resume_data: None)
+    monkeypatch.setattr(
+        resume_mod,
+        "_run_new_user_bootstrap_pipeline",
+        lambda uid: (_ for _ in ()).throw(RuntimeError("must not run")),
+    )
+    resp = client.post("/resumes", json={"parsed_data": {"summary": "x"}})
+    assert resp.status_code == 200
+
+
+def test_new_user_bootstrap_pipeline_skips_when_user_missing(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    db = _DB()
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(resume_mod, "get_user_by_id", lambda _db, _uid: None)
+    resume_mod._run_new_user_bootstrap_pipeline("u1")
+    assert db.closed is True
+
+
+def test_new_user_bootstrap_pipeline_runs_collector_and_match(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class _User:
+        search_category_id = "c1"
+
+    db = _DB()
+    called = {"collector": False, "match": False}
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(resume_mod, "get_user_by_id", lambda _db, _uid: _User())
+    monkeypatch.setattr(
+        resume_mod,
+        "run_collector",
+        lambda _db, **kwargs: called.update(collector=(kwargs["results_wanted"] == 200 and kwargs["hours_old"] == 10)) or {},
+    )
+    monkeypatch.setattr(
+        resume_mod,
+        "run_deep_match_for_user",
+        lambda _db, _uid, since_hours: called.update(match=(since_hours == 10)) or {},
+    )
+    resume_mod._run_new_user_bootstrap_pipeline("u1")
+    assert called["collector"] is True
+    assert called["match"] is True
 
 
 def test_update_latest_resume_skips_immediate_matching_when_no_category(monkeypatch, client):

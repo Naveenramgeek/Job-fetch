@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.job_listing import compute_job_hash
-from app.repos.search_category_repo import get_all, get_categories_with_active_users
+from app.repos.search_category_repo import get_all, get_by_id as get_category_by_id, get_categories_with_active_users
 from app.repos.job_listing_repo import batch_upsert
 from app.services.job_fetcher import fetch_and_deduplicate_jobs
 
@@ -16,14 +16,23 @@ logger = logging.getLogger(__name__)
 # Shared list for thread results; protected by lock
 _shared_results: list[dict] = []
 _lock = threading.Lock()
-def _fetch_for_category(category_slug: str, category_id: str) -> list[dict]:
+
+
+def _fetch_for_category(
+    category_slug: str,
+    category_id: str,
+    results_wanted: int | None = None,
+    hours_old: int | None = None,
+) -> list[dict]:
     """Fetch jobs for one category. Called in worker thread."""
+    wanted = results_wanted if results_wanted is not None else settings.job_results_wanted
+    hours = hours_old if hours_old is not None else settings.job_hours_old
     try:
         df = fetch_and_deduplicate_jobs(
             search_term=category_slug.replace("_", " ").title(),
             location=settings.job_location,
-            results_wanted=settings.job_results_wanted,
-            hours_old=settings.job_hours_old,
+            results_wanted=wanted,
+            hours_old=hours,
         )
     except Exception as e:
         logger.warning("Fetch failed for category %s: %s", category_slug, e)
@@ -58,7 +67,13 @@ def _append_to_shared(rows: list[dict]) -> None:
         _shared_results.extend(rows)
 
 
-def run_collector(db: Session) -> dict:
+def run_collector(
+    db: Session,
+    *,
+    category_ids: list[str] | None = None,
+    results_wanted: int | None = None,
+    hours_old: int | None = None,
+) -> dict:
     """
     Run the full collector: fetch only categories with active users, spawn threads, dedupe, upsert.
     Returns {"total_fetched": int, "total_deduped": int, "inserted": int, "categories": int}.
@@ -66,26 +81,42 @@ def run_collector(db: Session) -> dict:
     global _shared_results
     _shared_results = []
 
-    categories = get_categories_with_active_users(db)
-    if not categories:
-        all_cats = get_all(db)
-        if not all_cats:
-            logger.warning("No search categories. Seed them first.")
-        else:
-            logger.info(
-                "No categories with active users; skipping scrape. "
-                "Total categories=%d (scrape only runs for categories in use)",
-                len(all_cats),
-            )
-        return {"total_fetched": 0, "total_deduped": 0, "inserted": 0, "categories": 0}
+    if category_ids:
+        categories = []
+        seen: set[str] = set()
+        for category_id in category_ids:
+            if not category_id or category_id in seen:
+                continue
+            seen.add(category_id)
+            cat = get_category_by_id(db, category_id)
+            if cat:
+                categories.append(cat)
+        if not categories:
+            return {"total_fetched": 0, "total_deduped": 0, "inserted": 0, "categories": 0}
+    else:
+        categories = get_categories_with_active_users(db)
+        if not categories:
+            all_cats = get_all(db)
+            if not all_cats:
+                logger.warning("No search categories. Seed them first.")
+            else:
+                logger.info(
+                    "No categories with active users; skipping scrape. "
+                    "Total categories=%d (scrape only runs for categories in use)",
+                    len(all_cats),
+                )
+            return {"total_fetched": 0, "total_deduped": 0, "inserted": 0, "categories": 0}
 
     logger.info("Fetching jobs for %d categories with active users: %s", len(categories), [c.slug for c in categories])
 
     with ThreadPoolExecutor(max_workers=min(len(categories), 8)) as executor:
-        futures = {
-            executor.submit(_fetch_for_category, c.slug, c.id): c
-            for c in categories
-        }
+        if results_wanted is None and hours_old is None:
+            futures = {executor.submit(_fetch_for_category, c.slug, c.id): c for c in categories}
+        else:
+            futures = {
+                executor.submit(_fetch_for_category, c.slug, c.id, results_wanted, hours_old): c
+                for c in categories
+            }
         for future in as_completed(futures):
             cat = futures[future]
             try:

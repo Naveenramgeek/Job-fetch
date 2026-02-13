@@ -599,6 +599,130 @@ def parse_certifications(section_text: str) -> List[str]:
     return [l.strip() for l in section_text.splitlines() if l.strip()]
 
 
+def _fallback_experience_from_text(section_text: str) -> List[ExperienceItem]:
+    """
+    Best-effort salvage parser for experience blocks when strict parsing fails.
+    Keeps entries editable in UI instead of pushing known section content to "other".
+    """
+    lines = [l.strip() for l in section_text.splitlines() if l.strip()]
+    if not lines:
+        return []
+
+    out: List[ExperienceItem] = []
+    current: Optional[ExperienceItem] = None
+
+    def flush():
+        nonlocal current
+        if current and (current.title or current.bullets):
+            out.append(current)
+        current = None
+
+    def looks_like_header(s: str) -> bool:
+        if not s or is_bullet(s):
+            return False
+        if re.search(r"\b(19|20)\d{2}\b", s) and re.search(r"[—\-–]", s):
+            return True
+        if re.search(r"\b(present|current)\b", s, re.IGNORECASE):
+            return True
+        return False
+
+    for line in lines:
+        if is_bullet(line):
+            if not current:
+                current = ExperienceItem(
+                    title=None,
+                    company=None,
+                    location=None,
+                    duration=None,
+                    start=None,
+                    end=None,
+                    bullets=[],
+                )
+            current.bullets.append(clean_bullet(line))
+            continue
+
+        if not current:
+            current = ExperienceItem(
+                title=normalize_inline_text(line),
+                company=None,
+                location=None,
+                duration=None,
+                start=None,
+                end=None,
+                bullets=[],
+            )
+            continue
+
+        if looks_like_header(line):
+            flush()
+            current = ExperienceItem(
+                title=normalize_inline_text(line),
+                company=None,
+                location=None,
+                duration=None,
+                start=None,
+                end=None,
+                bullets=[],
+            )
+            continue
+
+        # Continuation line: attach to last bullet if present, else keep as bullet.
+        if current.bullets:
+            current.bullets[-1] = normalize_inline_text(current.bullets[-1] + " " + line)
+        else:
+            current.bullets.append(normalize_inline_text(line))
+
+    flush()
+    return out
+
+
+def _fallback_education_from_text(section_text: str) -> List[EducationItem]:
+    lines = [clean_bullet(l.strip()) for l in section_text.splitlines() if l.strip()]
+    out: List[EducationItem] = []
+    for line in lines:
+        out.append(EducationItem(
+            degree=normalize_inline_text(line) or None,
+            institution=None,
+            location=None,
+            duration=None,
+            start=None,
+            end=None,
+            graduation=None,
+            gpa=None,
+        ))
+    return out
+
+
+def _fallback_projects_from_text(section_text: str) -> List[ProjectItem]:
+    lines = [l.strip() for l in section_text.splitlines() if l.strip()]
+    if not lines:
+        return []
+
+    out: List[ProjectItem] = []
+    current_name: Optional[str] = clean_bullet(lines[0]) or None
+    bullets: List[str] = []
+
+    def flush():
+        nonlocal current_name, bullets
+        if current_name or bullets:
+            out.append(ProjectItem(name=current_name, bullets=bullets[:], link=None))
+        current_name = None
+        bullets = []
+
+    for line in lines[1:]:
+        if is_bullet(line):
+            bullets.append(clean_bullet(line))
+            continue
+        if current_name and bullets:
+            flush()
+            current_name = normalize_inline_text(line) or None
+            continue
+        bullets.append(normalize_inline_text(line))
+
+    flush()
+    return out
+
+
 # ---------------------------
 # "Other" blocks generator (so UI can fix misses)
 # ---------------------------
@@ -674,6 +798,14 @@ def build_resume_object(pdf_path: str, ocr_fallback: bool = True) -> Dict:
     proj_items = parse_projects(sections.get("projects", ""))
     skills = parse_skills(sections.get("skills", ""))
     certs = parse_certifications(sections.get("certifications", "")) if sections.get("certifications") else []
+
+    # Salvage known sections into editable structures when strict parser misses.
+    if sections.get("experience") and len(exp_items) == 0:
+        exp_items = _fallback_experience_from_text(sections["experience"])
+    if sections.get("education") and len(edu_items) == 0:
+        edu_items = _fallback_education_from_text(sections["education"])
+    if sections.get("projects") and len(proj_items) == 0:
+        proj_items = _fallback_projects_from_text(sections["projects"])
 
     other_blocks = build_other_blocks(
         sections=sections,

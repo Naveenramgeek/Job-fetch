@@ -9,7 +9,16 @@ import { basicSetup } from 'codemirror';
 import { ResumeApiService } from '../../../core/services/resume-api.service';
 import { JobsService } from '../../../core/services/jobs.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Contact, CustomSection, StructuredResume } from '../../../models/resume.model';
+import {
+  CertificationItem,
+  Contact,
+  CustomSection,
+  EducationItem,
+  ExperienceItem,
+  OtherBlock,
+  ProjectItem,
+  StructuredResume,
+} from '../../../models/resume.model';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { pageEnter, editEnter } from '../../../animations';
 
@@ -117,6 +126,12 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!Array.isArray((data as any).custom_sections)) {
       (data as any).custom_sections = [];
     }
+    if (!Array.isArray((data as any).experience)) (data as any).experience = [];
+    if (!Array.isArray((data as any).education)) (data as any).education = [];
+    if (!Array.isArray((data as any).projects)) (data as any).projects = [];
+    if (!Array.isArray((data as any).certifications)) (data as any).certifications = [];
+    if (!Array.isArray((data as any).other)) (data as any).other = [];
+    if (!data.skills || typeof data.skills !== 'object') (data as any).skills = {};
     if (data.contact) {
       const c = data.contact as Contact;
       if (c.title === undefined) c.title = null;
@@ -128,7 +143,203 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
         (data as any).certifications = (data.certifications as unknown as string[]).map((s) => ({ text: s, link: null }));
       }
     }
+    this.promoteParseFailedSections(data);
     return data;
+  }
+
+  private promoteParseFailedSections(data: StructuredResume): void {
+    const otherBlocks = Array.isArray(data.other) ? data.other : [];
+    const remaining: OtherBlock[] = [];
+
+    for (const block of otherBlocks) {
+      const source = block?.source_section;
+      const reason = block?.reason || '';
+      const text = (block?.text || '').trim();
+      const parseFailed = reason.endsWith('_parse_failed');
+
+      if (!parseFailed || !source || !text) {
+        remaining.push(block);
+        continue;
+      }
+
+      let promoted = false;
+      if (source === 'experience' && data.experience.length === 0) {
+        const experience = this.parseFallbackExperience(text);
+        if (experience.length) {
+          data.experience = experience;
+          promoted = true;
+        }
+      } else if (source === 'education' && data.education.length === 0) {
+        const education = this.parseFallbackEducation(text);
+        if (education.length) {
+          data.education = education;
+          promoted = true;
+        }
+      } else if (source === 'projects' && data.projects.length === 0) {
+        const projects = this.parseFallbackProjects(text);
+        if (projects.length) {
+          data.projects = projects;
+          promoted = true;
+        }
+      } else if (source === 'skills' && Object.keys(data.skills || {}).length === 0) {
+        const skills = this.parseFallbackSkills(text);
+        if (Object.keys(skills).length) {
+          data.skills = skills;
+          promoted = true;
+        }
+      } else if (source === 'certifications' && data.certifications.length === 0) {
+        const certifications = this.parseFallbackCertifications(text);
+        if (certifications.length) {
+          data.certifications = certifications;
+          promoted = true;
+        }
+      }
+
+      if (!promoted) {
+        remaining.push(block);
+      }
+    }
+
+    data.other = remaining;
+  }
+
+  private parseFallbackExperience(text: string): ExperienceItem[] {
+    const lines = this.lines(text);
+    const out: ExperienceItem[] = [];
+    let current: ExperienceItem | null = null;
+
+    for (const line of lines) {
+      if (this.isBullet(line)) {
+        if (!current) current = this.emptyExperience(null);
+        current.bullets.push(this.stripBullet(line));
+        continue;
+      }
+
+      if (!current) {
+        current = this.emptyExperience(line);
+        continue;
+      }
+
+      if (this.looksLikeExperienceHeader(line)) {
+        out.push(current);
+        current = this.emptyExperience(line);
+      } else {
+        current.bullets.push(line);
+      }
+    }
+
+    if (current) out.push(current);
+    return out.filter((x) => !!x.title || x.bullets.length > 0);
+  }
+
+  private parseFallbackEducation(text: string): EducationItem[] {
+    const lines = this.lines(text).map((line) => this.stripBullet(line));
+    const out: EducationItem[] = [];
+    for (const line of lines) {
+      out.push({
+        degree: line || null,
+        institution: null,
+        location: null,
+        duration: null,
+        start: null,
+        end: null,
+        graduation: null,
+        gpa: null,
+      });
+    }
+    return out;
+  }
+
+  private parseFallbackProjects(text: string): ProjectItem[] {
+    const lines = this.lines(text);
+    if (!lines.length) return [];
+
+    const out: ProjectItem[] = [];
+    let current: ProjectItem = { name: this.stripBullet(lines[0]) || null, bullets: [], link: null };
+
+    for (const line of lines.slice(1)) {
+      if (this.isBullet(line)) {
+        current.bullets.push(this.stripBullet(line));
+        continue;
+      }
+      if (current.name && current.bullets.length > 0) {
+        out.push(current);
+        current = { name: line, bullets: [], link: null };
+      } else {
+        current.bullets.push(line);
+      }
+    }
+    out.push(current);
+    return out.filter((x) => !!x.name || x.bullets.length > 0);
+  }
+
+  private parseFallbackSkills(text: string): Record<string, string[]> {
+    const groups: Record<string, string[]> = {};
+    const lines = this.lines(text);
+
+    for (const line of lines) {
+      if (line.includes(':')) {
+        const [rawKey, rawValues] = line.split(':', 2);
+        const key = rawKey.trim() || 'Skills';
+        const vals = rawValues
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean);
+        if (vals.length) groups[key] = vals;
+        continue;
+      }
+      const vals = line
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (vals.length) {
+        groups['Skills'] = [...(groups['Skills'] || []), ...vals];
+      }
+    }
+
+    return groups;
+  }
+
+  private parseFallbackCertifications(text: string): CertificationItem[] {
+    return this.lines(text)
+      .map((line) => this.stripBullet(line))
+      .filter(Boolean)
+      .map((line) => ({ text: line, link: null }));
+  }
+
+  private emptyExperience(title: string | null): ExperienceItem {
+    return {
+      title: title || null,
+      company: null,
+      location: null,
+      duration: null,
+      start: null,
+      end: null,
+      bullets: [],
+    };
+  }
+
+  private lines(text: string): string[] {
+    return text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+  }
+
+  private isBullet(line: string): boolean {
+    return /^[-*•]/.test(line.trim());
+  }
+
+  private stripBullet(line: string): string {
+    return line.replace(/^[-*•]\s*/, '').trim();
+  }
+
+  private looksLikeExperienceHeader(line: string): boolean {
+    const s = line.trim();
+    if (!s || this.isBullet(s)) return false;
+    if (/[—-]/.test(s) && /\b(19|20)\d{2}\b/.test(s)) return true;
+    if (/\b(present|current)\b/i.test(s) && s.split(/\s+/).length >= 3) return true;
+    return false;
   }
 
   startNewResume(): void {
@@ -181,6 +392,11 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   saveResume(): void {
     if (!this.resume) return;
+    const validationError = this.validateRequiredFields(this.resume);
+    if (validationError) {
+      this.snackBar.open(validationError, 'Close', { duration: 5000 });
+      return;
+    }
     this.saving = true;
     const onSuccess = () => {
       this.saving = false;
@@ -202,6 +418,36 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       },
     });
+  }
+
+  private validateRequiredFields(resume: StructuredResume): string | null {
+    const missingContact: string[] = [];
+    if (!resume.contact?.name?.trim()) missingContact.push('Name');
+    if (!resume.contact?.title?.trim()) missingContact.push('Professional title');
+    if (!resume.contact?.email?.trim()) missingContact.push('Email');
+    if (missingContact.length) {
+      this.activeTabIndex = 0;
+      return `Contact required: ${missingContact.join(', ')}`;
+    }
+
+    if (!Array.isArray(resume.education) || resume.education.length === 0) {
+      this.activeTabIndex = 3;
+      return 'Education required: add at least one education entry.';
+    }
+
+    for (let i = 0; i < resume.education.length; i++) {
+      const e = resume.education[i];
+      const missingEdu: string[] = [];
+      if (!e.degree?.trim()) missingEdu.push('Degree');
+      if (!e.institution?.trim()) missingEdu.push('Institution');
+      if (!e.start?.trim()) missingEdu.push('Start');
+      if (!e.end?.trim()) missingEdu.push('End');
+      if (missingEdu.length) {
+        this.activeTabIndex = 3;
+        return `Education #${i + 1} required: ${missingEdu.join(', ')}`;
+      }
+    }
+    return null;
   }
 
   onTabChange(index: number): void {

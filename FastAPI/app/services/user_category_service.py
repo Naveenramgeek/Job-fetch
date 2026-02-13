@@ -12,6 +12,9 @@ from app.services.llm_client import is_llm_enabled, llm_assign_category as llm_a
 logger = logging.getLogger(__name__)
 
 
+UNKNOWN_TITLES = {"", "unknown", "unknown role", "n/a", "na", "none", "null"}
+
+
 def _extract_title_from_resume(resume_data: dict[str, Any]) -> tuple[str, str]:
     """Extract job title from resume. Returns (lowercase for matching, raw for display)."""
     if not resume_data:
@@ -85,11 +88,15 @@ def assign_user_category(db: Session, user_id: str, resume_data: dict[str, Any] 
         resume = get_latest_by_user(db, user_id)
         resume_data = resume.parsed_data if resume and resume.parsed_data else {}
 
+    title_lc, raw_title = _extract_title_from_resume(resume_data)
+    if title_lc.strip() in UNKNOWN_TITLES:
+        logger.info("Skipping category assignment for user %s due to missing/unknown title: %r", user_id, raw_title)
+        return None
+
     slug = _keyword_assign_category(resume_data, slugs)
 
     if not slug and is_llm_enabled() and slugs:
         # Try LLM to map to existing category
-        _, raw_title = _extract_title_from_resume(resume_data)
         try:
             slug = llm_assign_category_call(raw_title or "Unknown", slugs)
         except Exception as e:
@@ -100,7 +107,6 @@ def assign_user_category(db: Session, user_id: str, resume_data: dict[str, Any] 
         cat = get_by_slug(db, slug)
     else:
         # No exact match: LLM suggests generic slug, else use deterministic fallback.
-        _, raw_title = _extract_title_from_resume(resume_data)
         if is_llm_enabled():
             try:
                 suggested_slug, display_name = llm_suggest_slug_call(raw_title or "Unknown")

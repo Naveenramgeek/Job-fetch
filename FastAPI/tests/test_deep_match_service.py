@@ -120,3 +120,29 @@ def test_run_deep_match_for_user_scores_and_returns_counts(monkeypatch):
         "skipped_low": 0,
     }
     assert calls["score_dist"] == ([92.5], "cat-1")
+
+
+def test_run_deep_match_for_user_skips_low_and_hard_gate(monkeypatch):
+    user = _User("u1", is_active=True, search_category_id="cat-1")
+    jobs = [_Job("j1"), _Job("j2")]
+    monkeypatch.setattr(dm, "get_by_id", lambda db, uid: user)
+    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: jobs)
+    monkeypatch.setattr(dm, "get_latest_by_user", lambda db, uid: _Resume({"experience": []}))
+    monkeypatch.setattr(dm, "get_existing_match", lambda db, uid, jid: False)
+    scores = iter(
+        [
+            {"match_score": 70.0, "hard_gate_blocked": False},
+            {"match_score": 95.0, "hard_gate_blocked": True},
+        ]
+    )
+    monkeypatch.setattr(dm, "_score_pair", lambda resume_data, title, description: next(scores))
+    monkeypatch.setattr(dm, "create_match", lambda db, **kwargs: (_ for _ in ()).throw(RuntimeError("must not create")))
+    out = dm.run_deep_match_for_user(db=object(), user_id="u1")
+    assert out == {
+        "user_id": "u1",
+        "category_id": "cat-1",
+        "jobs": 2,
+        "scored": 0,
+        "skipped_existing": 0,
+        "skipped_low": 2,
+    }
