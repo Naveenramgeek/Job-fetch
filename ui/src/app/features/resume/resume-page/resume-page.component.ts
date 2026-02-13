@@ -104,9 +104,14 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.loading = true;
     this.uploadError = null;
+    // Clear current state before parsing so a new upload always replaces,
+    // never visually merges with existing in-memory form data.
+    this.resume = null;
+    this.activeTabIndex = 0;
     this.api.parsePdf(file).subscribe({
       next: (parsed) => {
-        this.resume = this.normalizeResume(parsed);
+        // Deep-clone API payload to avoid any accidental shared references.
+        this.resume = this.normalizeResume(this.cloneResume(parsed));
         this.activeTabIndex = 0;
         this.loading = false;
         this.auth.setHasResume(true);
@@ -120,6 +125,13 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
         input.value = '';
       },
     });
+  }
+
+  private cloneResume(data: StructuredResume): StructuredResume {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(data);
+    }
+    return JSON.parse(JSON.stringify(data)) as StructuredResume;
   }
 
   private normalizeResume(data: StructuredResume): StructuredResume {

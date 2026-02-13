@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiBaseUrl: '', // set in build or use relative
+  apiBaseUrl: 'https://api.jobfetchagent.com', // set in build or use relative
 };
