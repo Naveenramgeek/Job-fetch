@@ -3,7 +3,7 @@
 # ---------------------------
 from dataclasses import asdict
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import OtherBlock, ExperienceItem, EducationItem, ProjectItem
 
@@ -13,8 +13,12 @@ PHONE_RE = re.compile(r"(\+?\d{1,3}[\s.-]?)?(\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4
 URL_RE = re.compile(r"(https?://\S+|www\.\S+|\bgithub\.com/\S+|\blinkedin\.com/\S+)", re.IGNORECASE)
 
 MONTH = r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)"
-DATE_TOKEN = rf"({MONTH}\s+\d{{4}}|\d{{4}}|Present)"
-DATE_RANGE_RE = re.compile(rf"(?P<start>{DATE_TOKEN})\s*[-–to]+\s*(?P<end>{DATE_TOKEN})", re.IGNORECASE)
+PRESENT_TOKEN = r"(Present|Pres\.?|Pre|Current|Curr\.?)"
+DATE_TOKEN = rf"({MONTH}\s+\d{{4}}|\d{{1,2}}[/-]\d{{4}}|\d{{4}}|{PRESENT_TOKEN})"
+DATE_RANGE_RE = re.compile(
+    rf"(?P<start>{DATE_TOKEN})\s*(?:-|–|—|to)\s*(?P<end>{DATE_TOKEN})",
+    re.IGNORECASE,
+)
 
 DEGREE_RE = re.compile(
     r"\b(MS|M\.S\.|Master|MTech|M\.Tech|MBA|PhD|Bachelors|Bachelor|B\.E\.|B\.Tech|BE|BS|B\.S\.)\b",
@@ -100,6 +104,64 @@ def extract_text_from_pdf(pdf_path: str, ocr_fallback: bool = True) -> str:
     return normalize_text(text)
 
 
+def extract_links_from_pdf(pdf_path: str) -> List[Tuple[Optional[str], str]]:
+    """
+    Extract hyperlink annotations from a PDF as (anchor_text, url) tuples.
+    Anchor text can be empty when the annotation has no selectable text.
+    """
+    try:
+        import pdfplumber
+    except ImportError:
+        return []
+
+    out: List[Tuple[Optional[str], str]] = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                words = page.extract_words() or []
+                links = getattr(page, "hyperlinks", None) or []
+                annots = getattr(page, "annots", None) or []
+                for ann in annots:
+                    raw_uri = ann.get("uri") or ann.get("URI") or ann.get("A", {}).get("URI")
+                    if raw_uri:
+                        links.append({
+                            "uri": raw_uri,
+                            "x0": ann.get("x0"),
+                            "x1": ann.get("x1"),
+                            "top": ann.get("top"),
+                            "bottom": ann.get("bottom"),
+                        })
+                for link in links:
+                    url = str(link.get("uri") or link.get("url") or "").strip()
+                    if not url:
+                        continue
+
+                    x0, x1 = link.get("x0"), link.get("x1")
+                    top, bottom = link.get("top"), link.get("bottom")
+                    anchor = ""
+                    if None not in (x0, x1, top, bottom):
+                        anchor_words: List[str] = []
+                        # Match words that overlap annotation rectangle.
+                        for w in words:
+                            wx0, wx1 = w.get("x0"), w.get("x1")
+                            wtop, wbottom = w.get("top"), w.get("bottom")
+                            if None in (wx0, wx1, wtop, wbottom):
+                                continue
+                            overlaps_x = float(wx1) >= float(x0) - 1 and float(wx0) <= float(x1) + 1
+                            overlaps_y = float(wbottom) >= float(top) - 1 and float(wtop) <= float(bottom) + 1
+                            if overlaps_x and overlaps_y:
+                                t = str(w.get("text") or "").strip()
+                                if t:
+                                    anchor_words.append(t)
+                        anchor = normalize_inline_text(" ".join(anchor_words))
+                    out.append((anchor or None, normalize_inline_text(url)))
+    except Exception:
+        # Never fail parsing because link extraction fails.
+        return []
+
+    return out
+
+
 def _looks_like_scanned_pdf(text_pages: List[str]) -> bool:
     low = sum(1 for t in text_pages if len((t or "").strip()) < 40)
     return low >= max(1, int(0.6 * len(text_pages)))
@@ -116,6 +178,9 @@ def _first_match(rx: re.Pattern, text: str) -> Optional[str]:
 def extract_contact(text: str) -> Dict[str, Optional[str]]:
     email = _first_match(EMAIL_RE, text)
     phone = _first_match(PHONE_RE, text)
+    if phone and ")" in phone and "(" not in phone:
+        # Some PDF extractors drop the opening parenthesis in area codes: "913) 749-8473".
+        phone = re.sub(r"^(\+?\d{1,3}\s*)?(\d{3}\))", r"\1(\2", phone)
     urls = URL_RE.findall(text)
 
     linkedin = next((u for u in urls if "linkedin.com" in u.lower()), None)
@@ -137,11 +202,204 @@ def extract_contact(text: str) -> Dict[str, Optional[str]]:
         "name": name,
         "email": email,
         "phone": phone,
-        "linkedin": linkedin,
-        "github": github,
+        "linkedin": _normalize_url(linkedin) if linkedin else None,
+        "github": _normalize_url(github) if github else None,
         "location": None,  # don't guess
         "title": None,  # e.g. Software Engineer, Sr DevOps Engineer; used for job fetching
     }
+
+
+def _normalize_url(url: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return u
+    if u.lower().startswith("mailto:"):
+        return u
+    if u.lower().startswith(("http://", "https://")):
+        return u
+    if u.lower().startswith("www."):
+        return "https://" + u
+    if "linkedin.com" in u.lower() or "github.com" in u.lower():
+        return "https://" + u
+    return u
+
+
+def _is_probable_url(url: str) -> bool:
+    u = (url or "").lower()
+    return u.startswith(("http://", "https://", "mailto:")) or "linkedin.com" in u or "github.com" in u or u.startswith("www.")
+
+
+def _should_replace_url(existing: Optional[str], candidate: str) -> bool:
+    if not candidate:
+        return False
+    if not existing:
+        return True
+    e = existing.strip()
+    c = candidate.strip()
+    if not e:
+        return True
+    e_has_scheme = e.lower().startswith(("http://", "https://"))
+    c_has_scheme = c.lower().startswith(("http://", "https://"))
+    if c_has_scheme and not e_has_scheme:
+        return True
+    # Prefer richer URLs (typically hidden annotation target) over short visible text.
+    if len(c) >= len(e) + 6:
+        return True
+    if e.lower() in c.lower() and len(c) > len(e):
+        return True
+    return False
+
+
+def _enrich_contact_from_links(contact: Dict[str, Optional[str]], link_candidates: List[Tuple[Optional[str], str]]) -> Set[str]:
+    used: Set[str] = set()
+
+    for anchor, raw_url in link_candidates:
+        url = _normalize_url(raw_url)
+        if not _is_probable_url(url):
+            continue
+        anchor_l = (anchor or "").lower()
+        url_l = url.lower()
+
+        if url_l.startswith("mailto:"):
+            email = url.split(":", 1)[1].strip()
+            if email and _should_replace_url(contact.get("email"), email):
+                contact["email"] = email
+                used.add(raw_url)
+            continue
+
+        if "linkedin.com" in url_l or "linkedin" in anchor_l:
+            if _should_replace_url(contact.get("linkedin"), url):
+                contact["linkedin"] = url
+                used.add(raw_url)
+            continue
+
+        if "github.com" in url_l or "github" in anchor_l:
+            if _should_replace_url(contact.get("github"), url):
+                contact["github"] = url
+                used.add(raw_url)
+            continue
+
+    return used
+
+
+def _guess_experience_from_line(raw: str) -> Optional[ExperienceItem]:
+    dr = DATE_RANGE_RE.search(raw)
+    if not dr:
+        return None
+    duration = dr.group(0).strip()
+    start, end = parse_date_range(duration)
+    prefix = raw[: dr.start()].strip().strip("|,;-")
+    suffix = raw[dr.end() :].strip().strip("|,;-")
+    location: Optional[str] = suffix or None
+
+    # Handle "... | Location" before/after date.
+    if "|" in prefix:
+        left, right = [x.strip() for x in prefix.split("|", 1)]
+        prefix = left
+        if not location:
+            location = right or None
+
+    title: Optional[str] = None
+    company: Optional[str] = None
+
+    m_paren = EXP_HDR_PAREN.match(prefix)
+    if m_paren:
+        title = m_paren.group("title").strip()
+        company = m_paren.group("company").strip()
+    elif "," in prefix:
+        t, c = [x.strip() for x in prefix.split(",", 1)]
+        title, company = t or None, c or None
+    else:
+        # Common: "Title — Company" or "Title - Company"
+        parts = re.split(r"\s+[—–-]\s+", prefix, maxsplit=1)
+        if len(parts) == 2:
+            title, company = parts[0].strip() or None, parts[1].strip() or None
+        else:
+            at_split = re.split(r"\s+\bat\b\s+", prefix, maxsplit=1, flags=re.IGNORECASE)
+            if len(at_split) == 2:
+                title, company = at_split[0].strip() or None, at_split[1].strip() or None
+
+    if not (title and company):
+        return None
+
+    return ExperienceItem(
+        title=title,
+        company=company,
+        location=location,
+        duration=duration,
+        start=start,
+        end=end,
+        bullets=[],
+    )
+
+
+def _project_link_score(anchor: Optional[str], url: str) -> int:
+    a = (anchor or "").lower()
+    u = (url or "").lower()
+    score = 0
+    if any(k in u for k in ("github.com", "gitlab.com", "bitbucket.org")):
+        score += 4
+    if any(k in a for k in ("github", "repo", "source", "project", "demo", "website", "link")):
+        score += 3
+    if any(k in u for k in ("vercel.app", "netlify.app", "herokuapp.com")):
+        score += 2
+    return score
+
+
+def _cert_link_score(anchor: Optional[str], url: str) -> int:
+    a = (anchor or "").lower()
+    u = (url or "").lower()
+    score = 0
+    if any(k in u for k in ("credly.com", "coursera.org", "udemy.com", "aws.training", "certificate", "certification", "badges")):
+        score += 4
+    if any(k in a for k in ("cert", "certificate", "credential", "badge", "verify", "link")):
+        score += 3
+    return score
+
+
+MATCH_STOPWORDS = {
+    "https", "http", "www", "com", "org", "net", "in", "co", "io",
+    "certificate", "certification", "credential", "verify", "verification",
+    "project", "projects", "repo", "repository", "website", "link",
+}
+
+
+def _match_tokens(text: Optional[str]) -> Set[str]:
+    if not text:
+        return set()
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
+    return {t for t in tokens if len(t) >= 3 and t not in MATCH_STOPWORDS}
+
+
+def _best_link_index_for_target(
+    target_text: Optional[str],
+    candidates: List[Tuple[Optional[str], str]],
+    base_score_fn,
+) -> Optional[int]:
+    target_tokens = _match_tokens(target_text)
+    if not candidates:
+        return None
+
+    best_idx: Optional[int] = None
+    best_score = -1
+    for idx, (anchor, url) in enumerate(candidates):
+        score = base_score_fn(anchor, url)
+        link_tokens = _match_tokens(anchor) | _match_tokens(url)
+        if target_tokens:
+            overlap = len(target_tokens & link_tokens)
+            score += overlap * 4
+            target_norm = normalize_inline_text(target_text or "").lower()
+            anchor_norm = normalize_inline_text(anchor or "").lower()
+            if target_norm and target_norm in anchor_norm:
+                score += 6
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+
+    # Keep assignments conservative: avoid attaching weak/unrelated links.
+    if best_score < 3:
+        return None
+    return best_idx
 
 
 # ---------------------------
@@ -295,6 +553,12 @@ EXP_HDR_PIPE_SPLIT = re.compile(
     re.IGNORECASE,
 )
 
+# Style C: "DevOps Engineer, MetLife 10/2024 – Present | Remote, USA"
+EXP_HDR_COMMA_DATE_LOC = re.compile(
+    rf"^(?P<title>[^,|]+)\s*,\s*(?P<company>[^|]+?)\s+(?P<duration>{DATE_TOKEN}\s*(?:-|–|—|to)\s*{DATE_TOKEN})\s*\|\s*(?P<location>.+?)\s*$",
+    re.IGNORECASE,
+)
+
 def parse_experience(section_text: str) -> List[ExperienceItem]:
     lines = [l.rstrip() for l in section_text.splitlines()]
     items: List[ExperienceItem] = []
@@ -380,6 +644,23 @@ def parse_experience(section_text: str) -> List[ExperienceItem]:
             i += 1
             continue
 
+        m = EXP_HDR_COMMA_DATE_LOC.match(raw)
+        if m:
+            flush()
+            duration = m.group("duration").strip()
+            start, end = parse_date_range(duration)
+            current = ExperienceItem(
+                title=m.group("title").strip(),
+                company=m.group("company").strip(),
+                location=m.group("location").strip(),
+                duration=duration,
+                start=start,
+                end=end,
+                bullets=[],
+            )
+            i += 1
+            continue
+
         m = EXP_HDR_PAREN.match(raw)
         if m:
             nxt1 = lines[i + 1].strip() if i + 1 < len(lines) else ""
@@ -400,6 +681,13 @@ def parse_experience(section_text: str) -> List[ExperienceItem]:
                 )
                 i += 2 if dr_line == nxt1 else 3
                 continue
+
+        guessed = _guess_experience_from_line(raw)
+        if guessed:
+            flush()
+            current = guessed
+            i += 1
+            continue
 
         # Continuation: append to last bullet if we're inside bullets
         if current and bullets:
@@ -539,9 +827,24 @@ def parse_education(section_text: str) -> List[EducationItem]:
                     if not duration:
                         inst_line, duration_from_inst = strip_duration(inst_line)
                         duration = duration_from_inst
+                    # Try to split "Institution, City, ST" while preserving original when ambiguous.
                     inst_line = inst_line.strip(" -–|,")
-                    institution = inst_line if inst_line else None
+                    if "|" in inst_line:
+                        inst_parts = [p.strip() for p in inst_line.split("|", 1)]
+                        institution = inst_parts[0] or None
+                        location = inst_parts[1] or None
+                    else:
+                        institution = inst_line if inst_line else None
                     i += 1  # consume paired line
+
+            # Single-line variant: "Degree, Institution ... <date-range>"
+            if not institution and "," in deg_clean:
+                deg_parts = [p.strip() for p in deg_clean.split(",", 1)]
+                if len(deg_parts) == 2:
+                    degree_candidate, inst_candidate = deg_parts
+                    if degree_candidate and inst_candidate:
+                        deg_clean = degree_candidate
+                        institution = inst_candidate
 
             if duration:
                 start, end = parse_date_range(duration)
@@ -568,6 +871,27 @@ def parse_education(section_text: str) -> List[EducationItem]:
 # Skills + Certifications
 # ---------------------------
 def parse_skills(section_text: str) -> Dict[str, List[str]]:
+    def split_csv_keeping_brackets(text: str) -> List[str]:
+        parts: List[str] = []
+        current: List[str] = []
+        depth = 0
+        for ch in text:
+            if ch == "(":
+                depth += 1
+            elif ch == ")" and depth > 0:
+                depth -= 1
+            if ch == "," and depth == 0:
+                token = "".join(current).strip().strip(".")
+                if token:
+                    parts.append(token)
+                current = []
+                continue
+            current.append(ch)
+        token = "".join(current).strip().strip(".")
+        if token:
+            parts.append(token)
+        return parts
+
     groups: Dict[str, List[str]] = {}
     lines = [l.strip() for l in section_text.splitlines() if l.strip()]
 
@@ -575,19 +899,19 @@ def parse_skills(section_text: str) -> Dict[str, List[str]]:
         if ":" in line:
             k, v = line.split(":", 1)
             key = k.strip()
-            vals = [x.strip().strip(".") for x in v.split(",") if x.strip()]
+            vals = split_csv_keeping_brackets(v)
             if key and vals:
                 groups[key] = vals
 
     if not groups and section_text.strip():
-        vals = [x.strip().strip(".") for x in section_text.replace("\n", ",").split(",") if x.strip()]
+        vals = split_csv_keeping_brackets(section_text.replace("\n", ","))
         groups["skills"] = vals
 
     return groups
 
 
-def parse_certifications(section_text: str) -> List[str]:
-    bullets = []
+def parse_certifications(section_text: str) -> List[Dict[str, Optional[str]]]:
+    bullets: List[str] = []
     for l in section_text.splitlines():
         s = l.strip()
         if not s:
@@ -595,8 +919,69 @@ def parse_certifications(section_text: str) -> List[str]:
         if is_bullet(s):
             bullets.append(clean_bullet(s))
     if bullets:
-        return bullets
-    return [l.strip() for l in section_text.splitlines() if l.strip()]
+        return [{"text": x, "link": None} for x in bullets]
+    return [{"text": l.strip(), "link": None} for l in section_text.splitlines() if l.strip()]
+
+
+def _attach_links_to_projects_and_certs(
+    projects: List[ProjectItem],
+    certifications: List[Dict[str, Optional[str]]],
+    link_candidates: List[Tuple[Optional[str], str]],
+    used_urls: Set[str],
+) -> None:
+    remaining: List[Tuple[Optional[str], str]] = []
+    for anchor, raw_url in link_candidates:
+        if raw_url in used_urls:
+            continue
+        url = _normalize_url(raw_url)
+        if not _is_probable_url(url):
+            continue
+        remaining.append((anchor, url))
+
+    # Deduplicate by URL so the same hyperlink never gets assigned to multiple items
+    # just because it appeared via both hyperlink and annotation extraction paths.
+    by_url: Dict[str, Optional[str]] = {}
+    for anchor, url in remaining:
+        if url not in by_url:
+            by_url[url] = anchor
+            continue
+        prev_anchor = by_url[url] or ""
+        if len((anchor or "").strip()) > len(prev_anchor.strip()):
+            by_url[url] = anchor
+    unique_remaining = [(anchor, url) for url, anchor in by_url.items()]
+
+    project_links = sorted(
+        [x for x in unique_remaining if _project_link_score(x[0], x[1]) > 0],
+        key=lambda x: _project_link_score(x[0], x[1]),
+        reverse=True,
+    )
+    cert_links = sorted(
+        [x for x in unique_remaining if _cert_link_score(x[0], x[1]) > 0 and x not in project_links],
+        key=lambda x: _cert_link_score(x[0], x[1]),
+        reverse=True,
+    )
+
+    for p in projects:
+        if p.link:
+            continue
+        if not project_links:
+            break
+        idx = _best_link_index_for_target(p.name, project_links, _project_link_score)
+        if idx is None:
+            continue
+        _, url = project_links.pop(idx)
+        p.link = url
+
+    for cert in certifications:
+        if cert.get("link"):
+            continue
+        if not cert_links:
+            break
+        idx = _best_link_index_for_target(str(cert.get("text") or ""), cert_links, _cert_link_score)
+        if idx is None:
+            continue
+        _, url = cert_links.pop(idx)
+        cert["link"] = url
 
 
 def _fallback_experience_from_text(section_text: str) -> List[ExperienceItem]:
@@ -733,7 +1118,7 @@ def build_other_blocks(
     education_items: List[EducationItem],
     project_items: List[ProjectItem],
     skills_groups: Dict[str, List[str]],
-    certifications: List[str],
+    certifications: List[Dict[str, Optional[str]]],
 ) -> List[OtherBlock]:
     others: List[OtherBlock] = []
     others.extend(unknown_heading_blocks)
@@ -788,7 +1173,9 @@ def build_other_blocks(
 # ---------------------------
 def build_resume_object(pdf_path: str, ocr_fallback: bool = True) -> Dict:
     raw_text = extract_text_from_pdf(pdf_path, ocr_fallback=ocr_fallback)
+    link_candidates = extract_links_from_pdf(pdf_path)
     contact = extract_contact(raw_text)
+    used_urls = _enrich_contact_from_links(contact, link_candidates)
 
     sections, unknown_heading_blocks = split_sections_with_unknowns(raw_text)
 
@@ -806,6 +1193,8 @@ def build_resume_object(pdf_path: str, ocr_fallback: bool = True) -> Dict:
         edu_items = _fallback_education_from_text(sections["education"])
     if sections.get("projects") and len(proj_items) == 0:
         proj_items = _fallback_projects_from_text(sections["projects"])
+
+    _attach_links_to_projects_and_certs(proj_items, certs, link_candidates, used_urls)
 
     other_blocks = build_other_blocks(
         sections=sections,
