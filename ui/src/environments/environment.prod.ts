@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiBaseUrl: '', // set in build or use relative
+  apiBaseUrl: 'http://127.0.0.1:8000', // set in build or use relative
 };

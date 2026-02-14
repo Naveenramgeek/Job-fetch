@@ -215,9 +215,9 @@ def _merge_experience_items(sections: dict[str, Any], resume_data: dict[str, Any
         seen.add(ident)
         merged.append(item)
 
-    # Ensure chronological ordering and keep a practical cap.
+    # Ensure chronological ordering; keep all merged experiences.
     merged = sorted(merged, key=_experience_sort_key, reverse=True)
-    return merged[:6]
+    return merged
 
 
 def _format_certification(cert: Any) -> str:
@@ -255,17 +255,32 @@ def _collect_skill_values(value: Any) -> list[str]:
     return out
 
 
+def _collect_values_for_matching_skill_keys(value: Any, keywords: list[str]) -> list[str]:
+    out: list[str] = []
+    if isinstance(value, dict):
+        for k, v in value.items():
+            key_norm = str(k or "").lower()
+            if any(word in key_norm for word in keywords):
+                out.extend(_collect_skill_values(v))
+            out.extend(_collect_values_for_matching_skill_keys(v, keywords))
+    elif isinstance(value, list):
+        for item in value:
+            out.extend(_collect_values_for_matching_skill_keys(item, keywords))
+    return out
+
+
 def _skills_from_resume(skills: dict[str, Any], keywords: list[str]) -> list[str]:
     matches: list[str] = []
-    all_values: list[str] = []
     for k, v in skills.items():
         key_norm = str(k or "").lower()
-        vals = _collect_skill_values(v)
-        all_values.extend(vals)
         if any(word in key_norm for word in keywords):
-            matches.extend(vals)
+            matches.extend(_collect_skill_values(v))
+        # Also support nested shapes like {"Core Skills": {"Languages": [...]}}
+        matches.extend(_collect_values_for_matching_skill_keys(v, keywords))
 
-    chosen = matches if matches else all_values
+    # Do not fall back to all skills here; that causes each skill bucket
+    # (Languages/Frameworks/Cloud/etc.) to repeat the same full list.
+    chosen = matches
     deduped: list[str] = []
     seen: set[str] = set()
     for item in chosen:
@@ -325,7 +340,7 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
 
     exp_items = _merge_experience_items(sections, resume_data)
     exp_blocks: list[str] = []
-    for e in exp_items[:6]:
+    for e in exp_items:
         title = _format_latex_text(e.get("title") or "Role")
         company = _format_latex_text(e.get("company") or "Company")
         location = _format_latex_text(e.get("location") or "")
@@ -408,18 +423,67 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
     tools = _skills_value("tools", ["Tools", "tools"], ["tool", "testing", "monitoring", "git"])
 
     certs = resume_data.get("certifications") or []
-    cert_lines = []
+    cert_lines: list[str] = []
     for c in certs[:6]:
         txt = _format_certification(c)
         if txt:
             cert_lines.append(rf"\item {txt}")
-    if not cert_lines:
-        cert_lines = [r"\item N/A"]
 
-    exp_content = chr(10).join(exp_blocks) if exp_blocks else r"\item \small{No experience entries available.}"
-    proj_content = chr(10).join(proj_blocks) if proj_blocks else r"\item \small{No project entries available.}"
-    edu_content = chr(10).join(edu_blocks) if edu_blocks else r"\item \small{No education entries available.}"
-    cert_content = chr(10).join(cert_lines)
+    skill_rows = []
+    if languages:
+        skill_rows.append(rf"\textbf{{Languages:}} {languages} \\")
+    if frameworks:
+        skill_rows.append(rf"\textbf{{Frameworks:}} {frameworks} \\")
+    if cloud_devops:
+        skill_rows.append(rf"\textbf{{Cloud/DevOps:}} {cloud_devops} \\")
+    if databases:
+        skill_rows.append(rf"\textbf{{Databases:}} {databases} \\")
+    if tools:
+        skill_rows.append(rf"\textbf{{Tools:}} {tools} \\")
+
+    work_section = ""
+    if exp_blocks:
+        exp_content = chr(10).join(exp_blocks)
+        work_section = rf"""\section{{Work Experience}}
+\begin{{itemize}}[leftmargin=0in, label={{}}]
+{exp_content}
+\end{{itemize}}"""
+
+    projects_section = ""
+    if proj_blocks:
+        proj_content = chr(10).join(proj_blocks)
+        projects_section = rf"""\section{{Projects}}
+\begin{{itemize}}[leftmargin=0in, label={{}}]
+{proj_content}
+\end{{itemize}}"""
+
+    education_section = ""
+    if edu_blocks:
+        edu_content = chr(10).join(edu_blocks)
+        education_section = rf"""\section{{Education}}
+\begin{{itemize}}[leftmargin=0in, label={{}}]
+{edu_content}
+\end{{itemize}}"""
+
+    skills_section = ""
+    if skill_rows:
+        skills_content = chr(10).join(skill_rows)
+        skills_section = rf"""\section{{Technical Skills}}
+\begin{{itemize}}[leftmargin=0.15in, label={{}}]
+\small{{
+\item{{
+{skills_content}
+}}
+}}
+\end{{itemize}}"""
+
+    certifications_section = ""
+    if cert_lines:
+        cert_content = chr(10).join(cert_lines)
+        certifications_section = rf"""\section{{Certifications}}
+\begin{{itemize}}[leftmargin=0.15in]
+{cert_content}
+\end{{itemize}}"""
 
     return rf"""{LATEX_PREAMBLE}
 
@@ -433,38 +497,15 @@ def _render_latex(resume_data: dict[str, Any], sections: dict[str, Any]) -> str:
 \section{{Professional Summary}}
 \small{{{summary_text}}}
 
-\section{{Work Experience}}
-\begin{{itemize}}[leftmargin=0in, label={{}}]
-{exp_content}
-\end{{itemize}}
+{work_section}
 
-\section{{Projects}}
-\begin{{itemize}}[leftmargin=0in, label={{}}]
-{proj_content}
-\end{{itemize}}
+{projects_section}
 
-\section{{Education}}
-\begin{{itemize}}[leftmargin=0in, label={{}}]
-{edu_content}
-\end{{itemize}}
+{education_section}
 
-\section{{Technical Skills}}
-\begin{{itemize}}[leftmargin=0.15in, label={{}}]
-\small{{
-\item{{
-\textbf{{Languages:}} {languages} \\
-\textbf{{Frameworks:}} {frameworks} \\
-\textbf{{Cloud/DevOps:}} {cloud_devops} \\
-\textbf{{Databases:}} {databases} \\
-\textbf{{Tools:}} {tools} \\
-}}
-}}
-\end{{itemize}}
+{skills_section}
 
-\section{{Certifications}}
-\begin{{itemize}}[leftmargin=0.15in]
-{cert_content}
-\end{{itemize}}
+{certifications_section}
 
 \end{{document}}
 """

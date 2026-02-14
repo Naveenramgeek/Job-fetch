@@ -89,6 +89,18 @@ def test_experience_merge_and_bullet_extract():
     assert any(m["title"] == "E1" for m in merged)
 
 
+def test_experience_merge_keeps_all_items_not_capped():
+    resume_data = {
+        "experience": [
+            {"title": f"E{i}", "company": f"C{i}", "duration": f"20{i:02d} - 20{i:02d}"}
+            for i in range(8)
+        ]
+    }
+    sections = {"experience": []}
+    merged = rts._merge_experience_items(sections, resume_data)
+    assert len(merged) == 8
+
+
 def test_skills_collect_and_infer():
     vals = rts._collect_skill_values({"a": ["Python", {"x": "AWS, Docker"}], "b": "Postgres"})
     assert "Python" in vals and "AWS" in vals and "Postgres" in vals
@@ -97,6 +109,15 @@ def test_skills_collect_and_infer():
         ["cloud", "devops"],
     )
     assert "AWS" in inferred
+
+
+def test_skills_infer_does_not_fallback_to_all_values_for_unmatched_bucket():
+    # Generic key should not bleed all values into every tailored bucket.
+    inferred = rts._skills_from_resume(
+        {"skills": ["Python", "AWS", "Docker"]},
+        ["database"],
+    )
+    assert inferred == []
 
 
 def test_fallback_sections_and_generate_tailored_fallback(monkeypatch):
@@ -129,6 +150,31 @@ def test_format_certification_variants_and_project_education_blocks():
     latex = rts._render_latex(resume_data, sections)
     assert "Technologies: Python" in latex
     assert "Certifications" in latex
+
+
+def test_render_latex_omits_empty_sections_instead_of_placeholders():
+    resume_data = {
+        "contact": {"name": "User", "email": "user@example.com"},
+        "education": [],
+        "certifications": [],
+        "skills": {},
+    }
+    sections = {
+        "summary_lines": ["one", "two", "three"],
+        "experience": [],
+        "projects": [],
+        "skills": {},
+    }
+    latex = rts._render_latex(resume_data, sections)
+    assert "No experience entries available" not in latex
+    assert "No project entries available" not in latex
+    assert "No education entries available" not in latex
+    assert r"\item N/A" not in latex
+    assert r"\section{Work Experience}" not in latex
+    assert r"\section{Projects}" not in latex
+    assert r"\section{Education}" not in latex
+    assert r"\section{Technical Skills}" not in latex
+    assert r"\section{Certifications}" not in latex
 
 
 def test_generate_tailored_success_and_collect_scalar_skill_values(monkeypatch):
