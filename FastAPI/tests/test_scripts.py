@@ -45,11 +45,9 @@ def test_run_collector_pipeline_run_pipeline(monkeypatch):
     monkeypatch.setattr(rcp, "seed_default_categories", lambda db: ([], 0))
     monkeypatch.setattr(rcp, "run_collector", lambda db: {"fetched": 1})
     monkeypatch.setattr(rcp, "run_deep_match_all", lambda db: {"scored": 2})
-    monkeypatch.setattr(rcp, "delete_unmatched_job_listings", lambda db: 3)
     out = rcp.run_pipeline(db=object())
     assert out["collector"]["fetched"] == 1
     assert out["deep_match"]["scored"] == 2
-    assert out["cleanup_unmatched"] == 3
 
 
 def test_init_db_production_helpers(monkeypatch):
@@ -112,7 +110,6 @@ def test_run_collector_pipeline_main_once_collect_only(monkeypatch):
     monkeypatch.setattr(rcp, "seed_default_categories", lambda db: ([], 0))
     monkeypatch.setattr(rcp, "run_collector", lambda db: {"fetched": 1})
     monkeypatch.setattr(rcp, "run_deep_match_all", lambda db: {"scored": 2})
-    monkeypatch.setattr(rcp, "delete_unmatched_job_listings", lambda db: 3)
     monkeypatch.setattr(rcp, "INTERVAL_SECONDS", 1)
     monkeypatch.setattr(rcp.argparse.ArgumentParser, "parse_args", lambda self: type("A", (), {"once": True, "collect_only": True})())
     rcp.main()

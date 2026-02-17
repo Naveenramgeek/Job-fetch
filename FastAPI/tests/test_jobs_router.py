@@ -32,12 +32,12 @@ def test_run_pipeline_returns_500_when_internal_fails(monkeypatch, admin_client)
 
 def test_run_pipeline_success(monkeypatch, admin_client):
     monkeypatch.setattr("app.repos.search_category_repo.seed_default_categories", lambda db: ([], 0))
-    monkeypatch.setattr("app.repos.job_listing_repo.delete_unmatched", lambda db: 5)
     monkeypatch.setattr(jobs_mod, "run_collector", lambda db: {"fetched": 10})
     monkeypatch.setattr(jobs_mod, "run_deep_match_all", lambda db: {"scored": 3})
     resp = admin_client.post("/jobs/run-pipeline")
     assert resp.status_code == 200
-    assert resp.json()["cleanup_unmatched"] == 5
+    assert resp.json()["collector"]["fetched"] == 10
+    assert resp.json()["deep_match"]["scored"] == 3
 
 
 def test_render_latex_pdf_sanitizes_errors(monkeypatch, client):

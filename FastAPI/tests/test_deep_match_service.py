@@ -22,14 +22,14 @@ class _Job:
 
 def test_run_deep_match_for_category_no_users_or_jobs(monkeypatch):
     monkeypatch.setattr(dm, "get_users_by_category", lambda db, cid: [])
-    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: [])
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: [])
     out = dm.run_deep_match_for_category(db=object(), search_category_id="c1")
     assert out == {"users": 0, "jobs": 0, "scored": 0}
 
 
 def test_run_deep_match_for_category_skips_existing_and_low_scores(monkeypatch):
     monkeypatch.setattr(dm, "get_users_by_category", lambda db, cid: [_User("u1")])
-    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: [_Job("j1"), _Job("j2"), _Job("j3")])
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: [_Job("j1"), _Job("j2"), _Job("j3")])
     monkeypatch.setattr(dm, "get_latest_by_user", lambda db, uid: _Resume({"experience": []}))
     monkeypatch.setattr(dm, "get_existing_match", lambda db, uid, jid: jid == "j1")
 
@@ -43,7 +43,7 @@ def test_run_deep_match_for_category_skips_existing_and_low_scores(monkeypatch):
     monkeypatch.setattr(dm, "create_match", lambda db, **kwargs: created.append(kwargs))
 
     # Mark descriptions so fake_score can branch.
-    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: [_Job("j1", description="j1"), _Job("j2", description="j2"), _Job("j3", description="j3")])
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: [_Job("j1", description="j1"), _Job("j2", description="j2"), _Job("j3", description="j3")])
     out = dm.run_deep_match_for_category(db=object(), search_category_id="c1")
     assert out["scored"] == 1
     assert len(created) == 1
@@ -73,9 +73,10 @@ def test_run_deep_match_for_user_guard_rails(monkeypatch):
     assert dm.run_deep_match_for_user(db, "u-no-cat")["reason"] == "missing_search_category"
 
 
-def test_run_deep_match_for_user_no_recent_jobs(monkeypatch):
+def test_run_deep_match_for_user_no_jobs(monkeypatch):
     user = _User("u1", is_active=True, search_category_id="cat-1")
     monkeypatch.setattr(dm, "get_by_id", lambda db, uid: user)
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: [])
     monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: [])
     out = dm.run_deep_match_for_user(db=object(), user_id="u1", since_hours=15)
     assert out == {
@@ -92,7 +93,7 @@ def test_run_deep_match_for_user_scores_and_returns_counts(monkeypatch):
     user = _User("u1", is_active=True, search_category_id="cat-1")
     jobs = [_Job("j1"), _Job("j2")]
     monkeypatch.setattr(dm, "get_by_id", lambda db, uid: user)
-    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: jobs)
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: jobs)
 
     calls = {"score_dist": None}
 
@@ -126,7 +127,7 @@ def test_run_deep_match_for_user_skips_low_and_hard_gate(monkeypatch):
     user = _User("u1", is_active=True, search_category_id="cat-1")
     jobs = [_Job("j1"), _Job("j2")]
     monkeypatch.setattr(dm, "get_by_id", lambda db, uid: user)
-    monkeypatch.setattr(dm, "get_jobs_by_category_since", lambda db, cid, since_hours: jobs)
+    monkeypatch.setattr(dm, "get_jobs_by_category", lambda db, cid: jobs)
     monkeypatch.setattr(dm, "get_latest_by_user", lambda db, uid: _Resume({"experience": []}))
     monkeypatch.setattr(dm, "get_existing_match", lambda db, uid, jid: False)
     scores = iter(

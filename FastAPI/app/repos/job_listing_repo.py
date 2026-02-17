@@ -71,6 +71,20 @@ def get_jobs_by_category_since(
     )
 
 
+def get_jobs_by_category(
+    db: Session,
+    search_category_id: str,
+    limit: int = 500,
+) -> list[JobListing]:
+    return (
+        db.query(JobListing)
+        .filter(JobListing.search_category_id == search_category_id)
+        .order_by(JobListing.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def get_all(
     db: Session,
     search_category_id: str | None = None,
@@ -87,6 +101,7 @@ def get_all_paginated(
     db: Session,
     search_category_id: str | None = None,
     search: str | None = None,
+    older_than_hours: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list[JobListing], int]:
@@ -103,6 +118,9 @@ def get_all_paginated(
                 JobListing.company.ilike(term),
             )
         )
+    if older_than_hours is not None and older_than_hours > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=older_than_hours)
+        q = q.filter(JobListing.created_at < cutoff)
     total = q.count()
     items = q.offset(offset).limit(limit).all()
     return items, total

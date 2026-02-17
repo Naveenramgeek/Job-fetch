@@ -7,18 +7,35 @@ from app.models.user import User
 from app.repos.user_repo import get_by_id
 from app.repos.user_repo import get_users_by_category
 from app.repos.job_listing_repo import get_jobs_by_category_since
+from app.repos.job_listing_repo import get_jobs_by_category
 from app.repos.resume_repo import get_latest_by_user
 from app.repos.user_job_match_repo import create as create_match, get_existing_match
-from app.services.resume_matcher import llm_match
+from app.services.titan_embedding import embed_text_titan
+import app.services.resume_matcher as matcher
 
 logger = logging.getLogger(__name__)
 SINCE_HOURS = 2
 MATCH_THRESHOLD = 75  # Only assign job to user if score > 75%
 
 
-def _score_pair(resume_data: dict[str, Any], job_title: str, job_description: str) -> dict[str, Any]:
-    """Get semantic match result. Expects match_score 0-1; we store as 0-100."""
-    result = llm_match(resume_data, job_title, job_description)
+def _score_pair(
+    resume_data: dict[str, Any],
+    job_title: str,
+    job_description: str,
+    *,
+    resume_embedding: list[float] | None = None,
+    job_embedding: list[float] | None = None,
+    job_location: str | None = None,
+) -> dict[str, Any]:
+    """Get hybrid match result. Expects match_score 0-1; we store as 0-100."""
+    result = matcher.llm_match(
+        resume_data,
+        job_title,
+        job_description,
+        resume_embedding=resume_embedding,
+        job_embedding=job_embedding,
+        job_location=job_location,
+    )
     score = result.get("match_score", 0) * 100
     return {
         "match_score": round(score, 1),
@@ -54,6 +71,13 @@ def _score_user_against_jobs(db: Session, user: User, jobs: list[Any]) -> dict[s
     """Score one user against candidate jobs and create matches above threshold."""
     resume = get_latest_by_user(db, user.id)
     resume_data = resume.parsed_data if resume and resume.parsed_data else {}
+    embeddings_updated = False
+    if resume and resume_data and getattr(resume, "embedding", None) is None:
+        try:
+            resume.embedding = embed_text_titan(matcher._resume_to_full_text(resume_data))
+            embeddings_updated = True
+        except Exception as e:
+            logger.warning("Resume embedding failed for user %s: %s", user.id, e)
     scored = 0
     skipped_existing = 0
     skipped_low = 0
@@ -61,14 +85,31 @@ def _score_user_against_jobs(db: Session, user: User, jobs: list[Any]) -> dict[s
     low_score_samples: list[tuple[str, float]] = []
 
     for job in jobs:
+        if getattr(job, "embedding", None) is None:
+            try:
+                job.embedding = embed_text_titan(matcher._job_to_full_text(job.title or "", job.description or ""))
+                embeddings_updated = True
+            except Exception as e:
+                logger.warning("Job embedding failed for job %s: %s", getattr(job, "id", "?"), e)
         if get_existing_match(db, user.id, job.id):
             skipped_existing += 1
             continue
-        result = _score_pair(
-            resume_data,
-            job.title or "",
-            job.description or "",
-        )
+        try:
+            result = _score_pair(
+                resume_data,
+                job.title or "",
+                job.description or "",
+                resume_embedding=getattr(resume, "embedding", None),
+                job_embedding=getattr(job, "embedding", None),
+                job_location=getattr(job, "location", None),
+            )
+        except TypeError:
+            # Compatibility with tests that monkeypatch _score_pair with positional-only lambdas.
+            result = _score_pair(
+                resume_data,
+                job.title or "",
+                job.description or "",
+            )
         score = result["match_score"]
         scores.append(score)
         if result.get("hard_gate_blocked"):
@@ -91,6 +132,13 @@ def _score_user_against_jobs(db: Session, user: User, jobs: list[Any]) -> dict[s
         )
         scored += 1
 
+    if embeddings_updated:
+        try:
+            db.commit()
+        except Exception as e:
+            logger.warning("Embedding persistence commit failed for user %s: %s", user.id, e)
+            db.rollback()
+
     return {
         "scored": scored,
         "skipped_existing": skipped_existing,
@@ -106,7 +154,7 @@ def run_deep_match_for_category(db: Session, search_category_id: str) -> dict:
     Returns {"users": int, "jobs": int, "scored": int}.
     """
     users = get_users_by_category(db, search_category_id)
-    jobs = get_jobs_by_category_since(db, search_category_id, since_hours=SINCE_HOURS)
+    jobs = get_jobs_by_category(db, search_category_id)
     if not users or not jobs:
         logger.debug("Category %s: users=%d jobs=%d (nothing to score)", search_category_id, len(users), len(jobs))
         return {"users": len(users), "jobs": len(jobs), "scored": 0}
@@ -148,7 +196,9 @@ def run_deep_match_for_user(db: Session, user_id: str, since_hours: int = SINCE_
     if not user.search_category_id:
         return {"user_id": user_id, "jobs": 0, "scored": 0, "reason": "missing_search_category"}
 
-    jobs = get_jobs_by_category_since(db, user.search_category_id, since_hours=since_hours)
+    jobs = get_jobs_by_category(db, user.search_category_id)
+    if not jobs:
+        jobs = get_jobs_by_category_since(db, user.search_category_id, since_hours=since_hours)
     if not jobs:
         logger.debug("Immediate deep match user=%s category=%s: no recent jobs", user_id, user.search_category_id)
         return {

@@ -311,4 +311,56 @@
     </div>
     <p *ngIf="!jobListings.length && !loading">No job listings. Seed categories first, or run the pipeline.</p>
   </section>
+
+  <section class="job-listings-section">
+    <h2>Old job listings (&gt;24h)</h2>
+    <div class="section-actions search-and-pagination">
+      <span class="pagination-info">{{ oldJobTotal ? 'Showing ' + ((oldJobPage - 1) * oldJobPageSize + 1) + '–' + min(oldJobPage * oldJobPageSize, oldJobTotal) + ' of ' + oldJobTotal : '0 of 0' }}</span>
+      <mat-form-field appearance="outline" class="page-size-field">
+        <mat-label>Per page</mat-label>
+        <mat-select [(ngModel)]="oldJobPageSize" (selectionChange)="onOldJobPageSizeChange()" name="oldJobPageSize">
+          <mat-option [value]="10">10</mat-option>
+          <mat-option [value]="20">20</mat-option>
+          <mat-option [value]="50">50</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button (click)="onOldJobPageChange(oldJobPage - 1)" [disabled]="oldJobPage <= 1" matTooltip="Previous">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-icon-button (click)="onOldJobPageChange(oldJobPage + 1)" [disabled]="oldJobPage * oldJobPageSize >= oldJobTotal" matTooltip="Next">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+    <div class="job-listings-table-wrap">
+      <table class="users-table job-listings-table" mat-table [dataSource]="oldJobListings">
+        <ng-container matColumnDef="title">
+          <th mat-header-cell *matHeaderCellDef>Title</th>
+          <td mat-cell *matCellDef="let j">{{ j.title }}</td>
+        </ng-container>
+        <ng-container matColumnDef="company">
+          <th mat-header-cell *matHeaderCellDef>Company</th>
+          <td mat-cell *matCellDef="let j">{{ j.company }}</td>
+        </ng-container>
+        <ng-container matColumnDef="created_at">
+          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <td mat-cell *matCellDef="let j">{{ formatDate(j.created_at) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let j">{{ categoryDisplay(j.search_category_id) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let j">
+            <button mat-icon-button color="warn" (click)="deleteJob(j)" matTooltip="Delete old job">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['title', 'company', 'created_at', 'category', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['title', 'company', 'created_at', 'category', 'actions']"></tr>
+      </table>
+    </div>
+    <p *ngIf="!oldJobListings.length && !loading">No old job listings found.</p>
+  </section>
 </div>

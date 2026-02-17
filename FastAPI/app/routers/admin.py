@@ -259,6 +259,30 @@ def list_job_listings(
     return {"items": [_job_listing_to_response(j) for j in listings], "total": total}
 
 
+@router.get("/job-listings/older-than-24h")
+def list_old_job_listings(
+    search_category_id: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_admin),
+):
+    """List job listings older than 24h for admin cleanup."""
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
+    offset = (page - 1) * page_size
+    listings, total = get_job_listings_paginated(
+        db,
+        search_category_id=search_category_id,
+        search=search,
+        older_than_hours=24,
+        limit=page_size,
+        offset=offset,
+    )
+    return {"items": [_job_listing_to_response(j) for j in listings], "total": total}
+
+
 @router.get("/job-listings/{listing_id}")
 def get_job_listing(
     listing_id: str,

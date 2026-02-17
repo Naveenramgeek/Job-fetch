@@ -3,6 +3,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 
 from app.models.user_job_match import UserJobMatch
+from app.models.job_listing import JobListing
 from app.core.security import generate_id
 
 
@@ -48,13 +49,14 @@ def get_matches_for_user(
     from sqlalchemy import or_
 
     q = db.query(UserJobMatch).filter(UserJobMatch.user_id == user_id)
+    q = q.join(JobListing, UserJobMatch.job_listing_id == JobListing.id)
     if status is not None:
         if status == "pending":
             q = q.filter(or_(UserJobMatch.status == "pending", UserJobMatch.status.is_(None)))
         else:
             q = q.filter(UserJobMatch.status == status)
     return (
-        q.order_by(UserJobMatch.match_score.desc(), UserJobMatch.created_at.desc())
+        q.order_by(JobListing.created_at.desc(), UserJobMatch.created_at.desc())
         .limit(limit)
         .all()
     )

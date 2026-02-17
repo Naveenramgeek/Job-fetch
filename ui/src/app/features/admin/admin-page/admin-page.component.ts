@@ -20,6 +20,7 @@ export class AdminPageComponent implements OnInit {
   users: AdminUser[] = [];
   categories: AdminCategory[] = [];
   jobListings: AdminJobListing[] = [];
+  oldJobListings: AdminJobListing[] = [];
   loading = false;
   error = '';
   pipelineError = '';
@@ -61,6 +62,9 @@ export class AdminPageComponent implements OnInit {
   jobPage = 1;
   jobPageSize = 20;
   jobTotal = 0;
+  oldJobPage = 1;
+  oldJobPageSize = 20;
+  oldJobTotal = 0;
   deleteAllJobsLoading = false;
 
   constructor(private adminApi: AdminApiService) {}
@@ -71,6 +75,7 @@ export class AdminPageComponent implements OnInit {
     this.loadPipelineStatus();
     this.loadCategories();
     this.loadJobListings();
+    this.loadOldJobListings();
   }
 
   loadPipelineStatus(): void {
@@ -309,14 +314,35 @@ export class AdminPageComponent implements OnInit {
       });
   }
 
+  loadOldJobListings(): void {
+    this.adminApi
+      .getOldJobListings({
+        search_category_id: this.jobCategoryFilter ?? undefined,
+        search: this.jobSearch || undefined,
+        page: this.oldJobPage,
+        page_size: this.oldJobPageSize,
+      })
+      .subscribe({
+        next: (res) => {
+          this.oldJobListings = res.items;
+          this.oldJobTotal = res.total;
+        },
+        error: () => (this.oldJobListings = []),
+      });
+  }
+
   onJobCategoryFilterChange(): void {
     this.jobPage = 1;
+    this.oldJobPage = 1;
     this.loadJobListings();
+    this.loadOldJobListings();
   }
 
   onJobSearch(): void {
     this.jobPage = 1;
+    this.oldJobPage = 1;
     this.loadJobListings();
+    this.loadOldJobListings();
   }
 
   onJobPageChange(page: number): void {
@@ -329,6 +355,16 @@ export class AdminPageComponent implements OnInit {
     this.loadJobListings();
   }
 
+  onOldJobPageChange(page: number): void {
+    this.oldJobPage = page;
+    this.loadOldJobListings();
+  }
+
+  onOldJobPageSizeChange(): void {
+    this.oldJobPage = 1;
+    this.loadOldJobListings();
+  }
+
   deleteAllJobs(): void {
     if (!confirm('Delete ALL job listings in the database? This cannot be undone.')) return;
     this.deleteAllJobsLoading = true;
@@ -337,6 +373,8 @@ export class AdminPageComponent implements OnInit {
         this.deleteAllJobsLoading = false;
         this.jobListings = [];
         this.jobTotal = 0;
+        this.oldJobListings = [];
+        this.oldJobTotal = 0;
         this.loadStats();
       },
       error: (err) => {
@@ -402,6 +440,7 @@ export class AdminPageComponent implements OnInit {
             this.editingJobId = null;
             this.loadStats();
             this.loadJobListings();
+            this.loadOldJobListings();
           },
           error: (err) => {
             this.jobFormError = err.error?.detail || err.message || 'Update failed';
@@ -415,6 +454,7 @@ export class AdminPageComponent implements OnInit {
           this.showJobForm = false;
           this.loadStats();
           this.loadJobListings();
+          this.loadOldJobListings();
         },
         error: (err) => {
           this.jobFormError = err.error?.detail || err.message || 'Create failed';
@@ -430,6 +470,7 @@ export class AdminPageComponent implements OnInit {
       next: () => {
         this.loadStats();
         this.loadJobListings();
+        this.loadOldJobListings();
       },
       error: (err) => {
         this.error = err.error?.detail || err.message || 'Delete failed';
