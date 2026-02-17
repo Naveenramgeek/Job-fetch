@@ -156,6 +156,7 @@ def test_admin_job_listing_crud_paths(monkeypatch, admin_client):
     monkeypatch.setattr(admin_mod, "delete_job_listing", lambda db, listing_id: listing_id == "j1")
 
     r_list = admin_client.get("/admin/job-listings?page=1&page_size=10")
+    r_old = admin_client.get("/admin/job-listings/older-than-24h?page=1&page_size=10")
     r_get = admin_client.get("/admin/job-listings/j1")
     r_create = admin_client.post(
         "/admin/job-listings",
@@ -167,6 +168,7 @@ def test_admin_job_listing_crud_paths(monkeypatch, admin_client):
     r_del_one_missing = admin_client.delete("/admin/job-listings/missing")
 
     assert r_list.status_code == 200 and r_list.json()["total"] == 1
+    assert r_old.status_code == 200 and r_old.json()["total"] == 1
     assert r_get.status_code == 200 and "description" in r_get.json()
     assert r_create.status_code == 200
     assert r_update.status_code == 200

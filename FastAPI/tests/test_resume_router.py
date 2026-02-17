@@ -137,7 +137,7 @@ def test_new_user_bootstrap_pipeline_skips_when_user_missing(monkeypatch):
     assert db.closed is True
 
 
-def test_new_user_bootstrap_pipeline_runs_collector_and_match(monkeypatch):
+def test_new_user_bootstrap_pipeline_uses_existing_jobs_without_collect(monkeypatch):
     class _DB:
         def __init__(self):
             self.closed = False
@@ -155,16 +155,49 @@ def test_new_user_bootstrap_pipeline_runs_collector_and_match(monkeypatch):
     monkeypatch.setattr(
         resume_mod,
         "run_collector",
-        lambda _db, **kwargs: called.update(collector=(kwargs["results_wanted"] == 200 and kwargs["hours_old"] == 10)) or {},
+        lambda _db, **kwargs: called.update(collector=True) or {},
     )
     monkeypatch.setattr(
         resume_mod,
         "run_deep_match_for_user",
-        lambda _db, _uid, since_hours: called.update(match=(since_hours == 10)) or {},
+        lambda _db, _uid, since_hours: called.update(match=(since_hours == 10)) or {"jobs": 3, "scored": 1},
     )
     resume_mod._run_new_user_bootstrap_pipeline("u1")
-    assert called["collector"] is True
+    assert called["collector"] is False
     assert called["match"] is True
+
+
+def test_new_user_bootstrap_pipeline_collects_if_no_jobs(monkeypatch):
+    class _DB:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class _User:
+        search_category_id = "c1"
+
+    db = _DB()
+    calls = {"collector": 0, "deep": 0}
+    monkeypatch.setattr(resume_mod, "SessionLocal", lambda: db)
+    monkeypatch.setattr(resume_mod, "get_user_by_id", lambda _db, _uid: _User())
+    monkeypatch.setattr(
+        resume_mod,
+        "run_collector",
+        lambda _db, **kwargs: calls.update(collector=calls["collector"] + 1) or {"fetched": 10},
+    )
+
+    def _deep(_db, _uid, since_hours):
+        calls["deep"] += 1
+        if calls["deep"] == 1:
+            return {"jobs": 0, "scored": 0}
+        return {"jobs": 5, "scored": 1}
+
+    monkeypatch.setattr(resume_mod, "run_deep_match_for_user", _deep)
+    resume_mod._run_new_user_bootstrap_pipeline("u1")
+    assert calls["collector"] == 1
+    assert calls["deep"] == 2
 
 
 def test_update_latest_resume_skips_immediate_matching_when_no_category(monkeypatch, client):

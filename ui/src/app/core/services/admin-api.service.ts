@@ -159,6 +159,22 @@ export class AdminApiService {
     return this.http.get<AdminJobListing>(`${this.base}/job-listings/${id}`);
   }
 
+  getOldJobListings(params?: {
+    search_category_id?: string | null;
+    search?: string;
+    page?: number;
+    page_size?: number;
+  }): Observable<AdminJobListingsResponse> {
+    const p = params || {};
+    const query: string[] = [];
+    if (p.search_category_id != null && p.search_category_id !== '') query.push(`search_category_id=${encodeURIComponent(p.search_category_id)}`);
+    if (p.search != null && p.search !== '') query.push(`search=${encodeURIComponent(p.search)}`);
+    if (p.page != null) query.push(`page=${p.page}`);
+    if (p.page_size != null) query.push(`page_size=${p.page_size}`);
+    const qs = query.length ? '?' + query.join('&') : '';
+    return this.http.get<AdminJobListingsResponse>(`${this.base}/job-listings/older-than-24h${qs}`);
+  }
+
   createJobListing(body: AdminJobListingCreate): Observable<AdminJobListing> {
     return this.http.post<AdminJobListing>(`${this.base}/job-listings`, body);
   }

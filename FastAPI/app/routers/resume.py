@@ -22,8 +22,9 @@ NEW_USER_BOOTSTRAP_RESULTS = 200
 
 def _run_new_user_bootstrap_pipeline(user_id: str) -> None:
     """
-    Onboarding bootstrap: fetch broader recent jobs and immediately score for one user.
-    Does not affect admin scheduler defaults (2h / 100 jobs).
+    Onboarding bootstrap:
+    1) Try matching against existing jobs in DB for the user's category.
+    2) If no category jobs exist, fetch last 10h and then match.
     """
     db = SessionLocal()
     try:
@@ -31,14 +32,24 @@ def _run_new_user_bootstrap_pipeline(user_id: str) -> None:
         if not user or not user.search_category_id:
             logger.info("New-user bootstrap skipped: missing user/category user_id=%s", user_id)
             return
+        deep = run_deep_match_for_user(db, user_id, since_hours=NEW_USER_BOOTSTRAP_HOURS)
+        if deep.get("jobs", 0) > 0:
+            logger.info("New-user bootstrap used existing jobs for user=%s: deep_match=%s", user_id, deep)
+            return
+
         collector = run_collector(
             db,
             category_ids=[user.search_category_id],
             results_wanted=NEW_USER_BOOTSTRAP_RESULTS,
             hours_old=NEW_USER_BOOTSTRAP_HOURS,
         )
-        deep = run_deep_match_for_user(db, user_id, since_hours=NEW_USER_BOOTSTRAP_HOURS)
-        logger.info("New-user bootstrap finished for user=%s: collector=%s deep_match=%s", user_id, collector, deep)
+        deep_after_collect = run_deep_match_for_user(db, user_id, since_hours=NEW_USER_BOOTSTRAP_HOURS)
+        logger.info(
+            "New-user bootstrap fetched fresh jobs for user=%s: collector=%s deep_match=%s",
+            user_id,
+            collector,
+            deep_after_collect,
+        )
     except Exception as e:
         logger.exception("New-user bootstrap failed for user=%s: %s", user_id, e)
     finally:

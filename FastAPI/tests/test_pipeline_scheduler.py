@@ -18,12 +18,9 @@ def test_run_pipeline_once_calls_components(monkeypatch):
     monkeypatch.setattr(sched, "seed_default_categories", lambda db: ([], 0))
     monkeypatch.setattr(sched, "run_collector", lambda db: {"fetched": 1})
     monkeypatch.setattr(sched, "run_deep_match_all", lambda db: {"scored": 2})
-    monkeypatch.setattr(sched, "delete_unmatched_job_listings", lambda db: 3)
-
     out = sched._run_pipeline_once()
     assert out["collector"]["fetched"] == 1
     assert out["deep_match"]["scored"] == 2
-    assert out["cleanup_unmatched"] == 3
     assert db.closed is True
 
 

@@ -3,6 +3,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from app.database import Base
 
@@ -26,6 +27,8 @@ class JobListing(Base):
     location = Column(String)
     job_url = Column(String, nullable=False)
     description = Column(Text)
+    # Titan embedding vector for hybrid semantic matching.
+    embedding = Column(Vector(1024))
     posted_at = Column(String)
     extra_data = Column(JSONB)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

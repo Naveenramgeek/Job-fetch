@@ -59,19 +59,15 @@ def run_pipeline(
     """Manually trigger the collector + deep match pipeline once. Admin only."""
     from app.repos.search_category_repo import seed_default_categories
 
-    from app.repos.job_listing_repo import delete_unmatched as delete_unmatched_job_listings
-
     logger.info("Pipeline (one-shot) triggered by admin %s", user.email)
     try:
         seed_default_categories(db)
         collector_result = run_collector(db)
         deep_result = run_deep_match_all(db)
-        cleanup_count = delete_unmatched_job_listings(db)
-        logger.info("Pipeline done: collector=%s deep_match=%s cleanup_unmatched=%d", collector_result, deep_result, cleanup_count)
+        logger.info("Pipeline done: collector=%s deep_match=%s", collector_result, deep_result)
         return {
             "collector": collector_result,
             "deep_match": deep_result,
-            "cleanup_unmatched": cleanup_count,
         }
     except Exception as e:
         logger.exception("Pipeline (one-shot) failed for admin=%s: %s", user.email, e)

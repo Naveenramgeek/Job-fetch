@@ -11,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 from app.config import settings
 from app.database import SessionLocal, init_db
 from app.repos.search_category_repo import seed_default_categories
-from app.repos.job_listing_repo import delete_unmatched as delete_unmatched_job_listings
 from app.services.job_collector import run_collector
 from app.services.deep_match_service import run_deep_match_all
 
@@ -34,15 +33,13 @@ def _run_pipeline_once() -> dict:
         seed_default_categories(db)
         collector_result = run_collector(db)
         deep_result = run_deep_match_all(db)
-        cleanup_count = delete_unmatched_job_listings(db)
         logger.info(
-            "Scheduled pipeline run: collector=%s deep_match=%s cleanup_unmatched=%d",
-            collector_result, deep_result, cleanup_count,
+            "Scheduled pipeline run: collector=%s deep_match=%s",
+            collector_result, deep_result,
         )
         return {
             "collector": collector_result,
             "deep_match": deep_result,
-            "cleanup_unmatched": cleanup_count,
         }
     finally:
         db.close()

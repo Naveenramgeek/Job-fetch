@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.database import engine, init_db
 
 MIGRATIONS = [
+    "CREATE EXTENSION IF NOT EXISTS vector",
     "DROP TABLE IF EXISTS job_embeddings",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS search_category_id VARCHAR",
     "ALTER TABLE user_job_matches ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'pending'",
@@ -16,6 +17,8 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_hash VARCHAR",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS temp_password_expires_at TIMESTAMPTZ",
+    "ALTER TABLE resumes ADD COLUMN IF NOT EXISTS embedding vector(1024)",
+    "ALTER TABLE job_listings ADD COLUMN IF NOT EXISTS embedding vector(1024)",
 ]
 
 

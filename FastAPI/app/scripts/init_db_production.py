@@ -164,6 +164,8 @@ def main() -> int:
 
         run_sql(ext_conn, f'GRANT ALL ON SCHEMA public TO "{target_user}"')
         print("Granted schema privileges")
+        run_sql(ext_conn, 'CREATE EXTENSION IF NOT EXISTS vector')
+        print("Ensured pgvector extension")
 
         ext_conn.close()
         print("Database provisioning complete.")
