@@ -6,6 +6,8 @@ JobFetch combines a FastAPI backend, Angular frontend, and PostgreSQL storage to
 - Authenticated resume parsing and management
 - Matched job listings with status tracking
 - AI resume tailoring from either saved jobs or pasted job descriptions
+- Titan embedding-based resume-to-job scoring via AWS Bedrock
+- Email-based account activation and password reset flows (Mailgun)
 - Admin operations for users, categories, and pipeline controls
 
 ---
@@ -240,7 +242,7 @@ JobFetchAgent/
 
 ## API Surface (High Level)
 
-- **Auth**: register, login, forgot-password, change-password, me/profile, delete account.
+- **Auth**: register/login, email activation, resend activation, forgot-password (email link), reset-password, change-password, me/profile, delete account.
 - **Resume**: get/update latest structured resume.
 - **Jobs**: matched/applied lists, status changes, skip/delete, pipeline control, tailoring + PDF rendering.
 - **Admin**: stats, users CRUD, category seed/list, job listing management.
@@ -287,7 +289,8 @@ JobFetchAgent/
   - Runs on push/PR to `main`
   - Validates backend + frontend
 - **Deploy**: `/.github/workflows/deploy.yml`
-  - Manual trigger
+  - Triggered on push to `main` only when backend deployment paths change (`FastAPI/**`, workflow file)
+  - Manual trigger supported via `workflow_dispatch`
   - SSH-based deployment template (with secrets)
 
 Recommended branch policy:
@@ -327,7 +330,20 @@ Critical vars:
 - `SECRET_KEY`
 - `APP_ENV`
 - `CORS_ALLOW_ORIGINS`
-- Bedrock/Titan settings
+- Bedrock/Titan settings:
+  - `AWS_REGION`
+  - `TITAN_EMBED_MODEL_ID`
+  - `BEDROCK_LLM_MODEL_ID`
+  - `BEDROCK_LLM_ENABLED`
+- Email activation/reset settings:
+  - `REQUIRE_EMAIL_ACTIVATION`
+  - `ACTIVATION_TOKEN_EXPIRE_MINUTES`
+  - `RESET_PASSWORD_TOKEN_EXPIRE_MINUTES`
+  - `FRONTEND_BASE_URL`
+- Mailgun settings:
+  - `MAILGUN_API_KEY`
+  - `MAILGUN_DOMAIN`
+  - `MAILGUN_FROM_EMAIL`
 
 ---
 
