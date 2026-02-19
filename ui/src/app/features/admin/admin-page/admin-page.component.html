@@ -75,8 +75,18 @@
         <span class="status-badge" [class.running]="pipelineStatus.running" [class.stopped]="!pipelineStatus.running">
           {{ pipelineStatus.running ? 'Running every ' + pipelineStatus.interval_hours + ' h' : 'Stopped' }}
         </span>
-        <span class="status-detail" *ngIf="pipelineStatus.last_run">Last run: {{ formatDate(pipelineStatus.last_run) }}</span>
-        <span class="status-detail" *ngIf="pipelineStatus.running && pipelineStatus.next_run">Next run: {{ formatDate(pipelineStatus.next_run) }}</span>
+        <span class="status-detail">
+          Last run:
+          {{ pipelineStatus.last_run ? (formatDate(pipelineStatus.last_run) + ' (' + lastRunAgo() + ')') : 'Not run yet' }}
+        </span>
+        <span class="status-detail" *ngIf="pipelineStatus.running">
+          Next run:
+          {{
+            pipelineStatus.next_run
+              ? (formatDate(pipelineStatus.next_run) + ' (in ' + nextRunIn() + ')')
+              : 'Calculating (current run in progress)'
+          }}
+        </span>
       </div>
       <div class="action-buttons">
         <button
