@@ -24,6 +24,14 @@ class _DB:
         self.closed = True
 
 
+class _Result:
+    def __init__(self, row):
+        self._row = row
+
+    def first(self):
+        return self._row
+
+
 def test_run_pipeline_once_calls_components(monkeypatch):
     db = _DB()
     monkeypatch.setattr(sched, "init_db", lambda: None)
@@ -122,3 +130,103 @@ def test_recover_scheduler_from_db_starts_thread_when_enabled(monkeypatch):
     monkeypatch.setattr(sched, "_ensure_thread_running", lambda: called.__setitem__("started", True))
     sched.recover_scheduler_from_db()
     assert called["started"] is True
+
+
+def test_recover_scheduler_from_db_noop_when_disabled(monkeypatch):
+    monkeypatch.setattr(sched, "_read_state", lambda: (False, None, None))
+    called = {"started": False}
+    monkeypatch.setattr(sched, "_ensure_thread_running", lambda: called.__setitem__("started", True))
+    sched.recover_scheduler_from_db()
+    assert called["started"] is False
+
+
+def test_read_state_returns_defaults_when_no_row(monkeypatch):
+    class _ReadDB(_DB):
+        def execute(self, *_args, **_kwargs):
+            return _Result(None)
+
+    monkeypatch.setattr(sched, "SessionLocal", lambda: _ReadDB())
+    monkeypatch.setattr(sched, "_ensure_state_row", lambda db: None)
+    enabled, last_run, next_run = sched._read_state()
+    assert enabled is False
+    assert last_run is None
+    assert next_run is None
+
+
+def test_read_state_returns_values(monkeypatch):
+    now = datetime.now(timezone.utc)
+
+    class _ReadDB(_DB):
+        def execute(self, *_args, **_kwargs):
+            return _Result((True, now, now))
+
+    monkeypatch.setattr(sched, "SessionLocal", lambda: _ReadDB())
+    monkeypatch.setattr(sched, "_ensure_state_row", lambda db: None)
+    enabled, last_run, next_run = sched._read_state()
+    assert enabled is True
+    assert last_run == now
+    assert next_run == now
+
+
+def test_setters_execute_without_error(monkeypatch):
+    db = _DB()
+    monkeypatch.setattr(sched, "SessionLocal", lambda: db)
+    monkeypatch.setattr(sched, "_ensure_state_row", lambda _db: None)
+    now = datetime.now(timezone.utc)
+    sched._set_enabled(True)
+    sched._set_run_times(now, now)
+    sched._set_next_run(now)
+    assert db.closed is True
+
+
+def test_is_enabled_reads_state(monkeypatch):
+    monkeypatch.setattr(sched, "_read_state", lambda: (True, None, None))
+    assert sched._is_enabled() is True
+
+
+def test_try_acquire_distributed_lock_handles_exception(monkeypatch):
+    class _BadDB:
+        def execute(self, *_args, **_kwargs):
+            raise RuntimeError("no advisory lock support")
+
+    assert sched._try_acquire_distributed_lock(_BadDB()) is True
+
+
+def test_release_distributed_lock_handles_exception():
+    class _BadDB:
+        def execute(self, *_args, **_kwargs):
+            raise RuntimeError("boom")
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            self.rolled_back = True
+
+    db = _BadDB()
+    sched._release_distributed_lock(db)
+    assert getattr(db, "rolled_back", False) is True
+
+
+def test_scheduler_loop_sets_next_run_on_failure(monkeypatch):
+    calls = {"enabled": True, "set_next": False}
+
+    monkeypatch.setattr(sched, "_read_state", lambda: (calls["enabled"], None, datetime.now(timezone.utc)))
+
+    def _boom():
+        raise RuntimeError("collector failed")
+
+    def _fake_sleep(_seconds):
+        calls["enabled"] = False
+
+    monkeypatch.setattr(sched, "_run_pipeline_once", _boom)
+    monkeypatch.setattr(
+        sched,
+        "_set_next_run",
+        lambda _dt: (calls.__setitem__("set_next", True), calls.__setitem__("enabled", False)),
+    )
+    monkeypatch.setattr(sched.time, "sleep", _fake_sleep)
+    sched._running = True
+    sched._thread = object()
+    sched._scheduler_loop()
+    assert calls["set_next"] is True
