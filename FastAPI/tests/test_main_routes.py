@@ -117,6 +117,7 @@ def test_startup_nonprod_calls_init_db(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "database_url", "postgresql://real:real@localhost:5432/db")
     called = {"ok": False}
     monkeypatch.setattr(main_mod, "init_db", lambda: called.update(ok=True))
+    monkeypatch.setattr(main_mod, "recover_scheduler_from_db", lambda: None)
     main_mod.on_startup()
     assert called["ok"] is True
 
@@ -137,6 +138,7 @@ def test_startup_nonprod_logs_placeholder_warnings(monkeypatch):
     monkeypatch.setattr(main_mod.settings, "secret_key", "replace-with-a-long-random-secret-key")
     monkeypatch.setattr(main_mod.settings, "database_url", "postgresql://username:password@localhost:5432/db")
     monkeypatch.setattr(main_mod, "init_db", lambda: None)
+    monkeypatch.setattr(main_mod, "recover_scheduler_from_db", lambda: None)
     seen = []
     monkeypatch.setattr(main_mod.logger, "warning", lambda msg: seen.append(msg))
 

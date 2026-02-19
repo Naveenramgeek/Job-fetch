@@ -9,6 +9,21 @@ from app.database import engine, init_db
 
 MIGRATIONS = [
     "CREATE EXTENSION IF NOT EXISTS vector",
+    """
+    CREATE TABLE IF NOT EXISTS pipeline_scheduler_state (
+        id VARCHAR PRIMARY KEY,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        last_run_at TIMESTAMPTZ NULL,
+        next_run_at TIMESTAMPTZ NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
+    """
+    INSERT INTO pipeline_scheduler_state (id, enabled)
+    VALUES ('default', FALSE)
+    ON CONFLICT (id) DO NOTHING
+    """,
     "DROP TABLE IF EXISTS job_embeddings",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS search_category_id VARCHAR",
     "ALTER TABLE user_job_matches ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'pending'",
