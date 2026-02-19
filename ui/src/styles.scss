@@ -153,3 +153,80 @@ body {
 .mat-mdc-progress-spinner {
   --mdc-circular-progress-active-indicator-color: #7ee787;
 }
+
+/* Global message banners: high-contrast and attention-grabbing */
+.error-msg,
+.success-msg,
+.warning-msg {
+  display: block;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 700 !important;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  position: sticky;
+  top: 80px;
+  z-index: 20;
+}
+
+.error-msg {
+  color: #ffd6d6 !important;
+  background: rgba(123, 22, 25, 0.82) !important;
+  border-color: rgba(248, 81, 73, 0.8) !important;
+}
+
+.success-msg {
+  color: #eaffea !important;
+  background: rgba(21, 72, 34, 0.86) !important;
+  border-color: rgba(126, 231, 135, 0.8) !important;
+}
+
+.warning-msg {
+  color: #fff6d8 !important;
+  background: rgba(92, 63, 12, 0.86) !important;
+  border-color: rgba(227, 179, 65, 0.8) !important;
+}
+
+/* Make invalid fields visibly dark red across app */
+.mat-mdc-form-field.mat-form-field-invalid .mat-mdc-text-field-wrapper {
+  background-color: rgba(103, 25, 29, 0.42) !important;
+}
+
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__leading,
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__notch,
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__trailing {
+  border-color: #f85149 !important;
+  border-width: 2px !important;
+}
+
+.mat-mdc-form-field.mat-form-field-invalid .mat-mdc-floating-label,
+.mat-mdc-form-field.mat-form-field-invalid .mat-mdc-form-field-error {
+  color: #ffb4b1 !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-error {
+  font-weight: 700 !important;
+}
+
+input.ng-invalid.ng-touched,
+textarea.ng-invalid.ng-touched,
+select.ng-invalid.ng-touched {
+  background: rgba(103, 25, 29, 0.35) !important;
+  border-color: #f85149 !important;
+}
+
+/* Top snackbars for quick-save operations */
+.mat-mdc-snack-bar-container.snack-success {
+  --mdc-snackbar-container-color: rgba(21, 72, 34, 0.96);
+  --mdc-snackbar-supporting-text-color: #eaffea;
+  --mat-snack-bar-button-color: #d7ffd7;
+}
+
+.mat-mdc-snack-bar-container.snack-error {
+  --mdc-snackbar-container-color: rgba(123, 22, 25, 0.96);
+  --mdc-snackbar-supporting-text-color: #ffe2e2;
+  --mat-snack-bar-button-color: #ffd2d2;
+}

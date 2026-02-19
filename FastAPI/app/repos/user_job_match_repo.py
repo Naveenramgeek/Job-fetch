@@ -7,6 +7,27 @@ from app.models.job_listing import JobListing
 from app.core.security import generate_id
 
 
+def _query_matches_for_user(
+    db: Session,
+    user_id: str,
+    status: str | None = "pending",
+    search: str | None = None,
+):
+    from sqlalchemy import or_
+
+    q = db.query(UserJobMatch).filter(UserJobMatch.user_id == user_id)
+    q = q.join(JobListing, UserJobMatch.job_listing_id == JobListing.id)
+    if status is not None:
+        if status == "pending":
+            q = q.filter(or_(UserJobMatch.status == "pending", UserJobMatch.status.is_(None)))
+        else:
+            q = q.filter(UserJobMatch.status == status)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        q = q.filter(or_(JobListing.title.ilike(term), JobListing.company.ilike(term)))
+    return q
+
+
 def create(
     db: Session,
     user_id: str,
@@ -44,22 +65,26 @@ def get_matches_for_user(
     db: Session,
     user_id: str,
     status: str | None = "pending",
+    search: str | None = None,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[UserJobMatch]:
-    from sqlalchemy import or_
-
-    q = db.query(UserJobMatch).filter(UserJobMatch.user_id == user_id)
-    q = q.join(JobListing, UserJobMatch.job_listing_id == JobListing.id)
-    if status is not None:
-        if status == "pending":
-            q = q.filter(or_(UserJobMatch.status == "pending", UserJobMatch.status.is_(None)))
-        else:
-            q = q.filter(UserJobMatch.status == status)
+    q = _query_matches_for_user(db, user_id, status=status, search=search)
     return (
         q.order_by(JobListing.created_at.desc(), UserJobMatch.created_at.desc())
+        .offset(offset)
         .limit(limit)
         .all()
     )
+
+
+def get_match_count_for_user(
+    db: Session,
+    user_id: str,
+    status: str | None = "pending",
+    search: str | None = None,
+) -> int:
+    return _query_matches_for_user(db, user_id, status=status, search=search).count()
 
 
 def get_match_for_user(db: Session, match_id: str, user_id: str) -> UserJobMatch | None:

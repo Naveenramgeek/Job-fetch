@@ -27,6 +27,7 @@ const routes: Routes = [
       { path: 'dashboard', loadChildren: () => import('./features/dashboard/dashboard.module').then((m) => m.DashboardModule) },
       { path: 'resume', loadChildren: () => import('./features/resume/resume.module').then((m) => m.ResumeModule) },
       { path: 'tailor-resume', loadChildren: () => import('./features/tailor-resume/tailor-resume.module').then((m) => m.TailorResumeModule) },
+      { path: 'feedback', loadChildren: () => import('./features/feedback/feedback.module').then((m) => m.FeedbackModule) },
       { path: 'account', loadChildren: () => import('./features/account/account.module').then((m) => m.AccountModule) },
       { path: 'admin', loadChildren: () => import('./features/admin/admin.module').then((m) => m.AdminModule), canActivate: [adminGuard] },
     ],

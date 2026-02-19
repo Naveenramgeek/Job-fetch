@@ -24,8 +24,6 @@ export interface UserResponse {
 
 export interface ForgotPasswordResponse {
   message: string;
-  temp_password?: string;
-  expires_in_minutes?: number;
 }
 
 export interface AuthResponse {
@@ -34,14 +32,18 @@ export interface AuthResponse {
   user: UserResponse;
 }
 
+export interface RegisterMessageResponse {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthApiService {
   private readonly base = `${environment.apiBaseUrl}/auth`;
 
   constructor(private http: HttpClient) {}
 
-  register(data: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.base}/register`, data);
+  register(data: RegisterRequest): Observable<AuthResponse | RegisterMessageResponse> {
+    return this.http.post<AuthResponse | RegisterMessageResponse>(`${this.base}/register`, data);
   }
 
   login(data: LoginRequest): Observable<AuthResponse> {
@@ -64,11 +66,27 @@ export class AuthApiService {
     return this.http.post<ForgotPasswordResponse>(`${this.base}/forgot-password`, { email });
   }
 
+  resetPassword(token: string, newPassword: string, confirmPassword: string): Observable<RegisterMessageResponse> {
+    return this.http.post<RegisterMessageResponse>(`${this.base}/reset-password`, {
+      token,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+  }
+
   changePassword(newPassword: string, confirmPassword: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.base}/change-password`, {
       new_password: newPassword,
       confirm_password: confirmPassword,
     });
+  }
+
+  activateAccount(token: string): Observable<AuthResponse> {
+    return this.http.get<AuthResponse>(`${this.base}/activate?token=${encodeURIComponent(token)}`);
+  }
+
+  resendActivation(email: string): Observable<RegisterMessageResponse> {
+    return this.http.post<RegisterMessageResponse>(`${this.base}/resend-activation`, { email });
   }
 }
 

@@ -119,3 +119,51 @@ def test_startup_nonprod_calls_init_db(monkeypatch):
     monkeypatch.setattr(main_mod, "init_db", lambda: called.update(ok=True))
     main_mod.on_startup()
     assert called["ok"] is True
+
+
+def test_startup_production_placeholder_db_url_raises(monkeypatch):
+    monkeypatch.setattr(main_mod.settings, "app_env", "production")
+    monkeypatch.setattr(main_mod.settings, "secret_key", "real-secret")
+    monkeypatch.setattr(main_mod.settings, "database_url", "postgresql://username:password@localhost:5432/db")
+    try:
+        main_mod.on_startup()
+        assert False, "expected runtime error"
+    except RuntimeError as exc:
+        assert "DATABASE_URL placeholder credentials" in str(exc)
+
+
+def test_startup_nonprod_logs_placeholder_warnings(monkeypatch):
+    monkeypatch.setattr(main_mod.settings, "app_env", "development")
+    monkeypatch.setattr(main_mod.settings, "secret_key", "replace-with-a-long-random-secret-key")
+    monkeypatch.setattr(main_mod.settings, "database_url", "postgresql://username:password@localhost:5432/db")
+    monkeypatch.setattr(main_mod, "init_db", lambda: None)
+    seen = []
+    monkeypatch.setattr(main_mod.logger, "warning", lambda msg: seen.append(msg))
+
+    main_mod.on_startup()
+    assert len(seen) == 2
+
+
+def test_parse_returns_500_when_upload_tempfile_fails(monkeypatch, client):
+    def boom_named_tempfile(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(main_mod.tempfile, "NamedTemporaryFile", boom_named_tempfile)
+    payload = b"%PDF-1.4 mock content"
+    resp = client.post(
+        "/parse",
+        files={"file": ("resume.pdf", BytesIO(payload), "application/pdf")},
+    )
+    assert resp.status_code == 500
+    assert "Failed to save upload" in resp.json()["detail"]
+
+
+def test_parse_returns_422_when_parser_raises(monkeypatch, client):
+    monkeypatch.setattr(main_mod, "build_resume_object", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("parse fail")))
+    payload = b"%PDF-1.4 mock content"
+    resp = client.post(
+        "/parse",
+        files={"file": ("resume.pdf", BytesIO(payload), "application/pdf")},
+    )
+    assert resp.status_code == 422
+    assert "Resume parsing failed" in resp.json()["detail"]

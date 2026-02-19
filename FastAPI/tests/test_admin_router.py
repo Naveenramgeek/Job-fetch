@@ -41,6 +41,17 @@ class _Listing:
         self.created_at = datetime.now(timezone.utc)
 
 
+class _Feedback:
+    def __init__(self, feedback_id="f1"):
+        self.id = feedback_id
+        self.user_id = "u1"
+        self.category = "General"
+        self.message = "Helpful app and easy to use"
+        self.rating = 5
+        self.page = "/feedback"
+        self.created_at = datetime.now(timezone.utc)
+
+
 def test_admin_stats_success(monkeypatch, admin_client):
     monkeypatch.setattr(admin_mod, "get_stats", lambda db: {"users_total": 1})
     resp = admin_client.get("/admin/stats")
@@ -62,6 +73,7 @@ def test_admin_list_users_paginates(monkeypatch, admin_client):
     body = resp.json()
     assert body["total"] == 1
     assert len(body["items"]) == 1
+    assert body["items"][0]["matched_jobs_count"] == 0
 
 
 def test_admin_get_user_not_found(monkeypatch, admin_client):
@@ -153,6 +165,7 @@ def test_admin_job_listing_crud_paths(monkeypatch, admin_client):
     monkeypatch.setattr(admin_mod, "create_job_listing", lambda db, **kwargs: _Listing(listing_id="j2"))
     monkeypatch.setattr(admin_mod, "update_job_listing", lambda db, listing_id, **kwargs: _Listing(listing_id=listing_id))
     monkeypatch.setattr(admin_mod, "delete_all_job_listings", lambda db: 3)
+    monkeypatch.setattr(admin_mod, "delete_old_job_listings", lambda db, hours: 2)
     monkeypatch.setattr(admin_mod, "delete_job_listing", lambda db, listing_id: listing_id == "j1")
 
     r_list = admin_client.get("/admin/job-listings?page=1&page_size=10")
@@ -164,6 +177,7 @@ def test_admin_job_listing_crud_paths(monkeypatch, admin_client):
     )
     r_update = admin_client.patch("/admin/job-listings/j1", json={"title": "Updated"})
     r_del_all = admin_client.delete("/admin/job-listings")
+    r_del_old = admin_client.delete("/admin/job-listings/older-than-24h/all")
     r_del_one_ok = admin_client.delete("/admin/job-listings/j1")
     r_del_one_missing = admin_client.delete("/admin/job-listings/missing")
 
@@ -173,5 +187,16 @@ def test_admin_job_listing_crud_paths(monkeypatch, admin_client):
     assert r_create.status_code == 200
     assert r_update.status_code == 200
     assert r_del_all.status_code == 200 and r_del_all.json()["deleted"] == 3
+    assert r_del_old.status_code == 200 and r_del_old.json()["deleted"] == 2
     assert r_del_one_ok.status_code == 200
     assert r_del_one_missing.status_code == 404
+
+
+def test_admin_feedback_list(monkeypatch, admin_client):
+    user = _User(user_id="u1", email="user1@example.com")
+    monkeypatch.setattr(admin_mod, "get_feedback_paginated", lambda db, search, page, page_size: ([(_Feedback(), user)], 1))
+    resp = admin_client.get("/admin/feedback?page=1&page_size=20")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["user_email"] == "user1@example.com"

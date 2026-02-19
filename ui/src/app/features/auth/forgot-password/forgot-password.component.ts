@@ -12,8 +12,7 @@ export class ForgotPasswordComponent {
   loading = false;
   error = '';
   success = false;
-  tempPassword = '';
-  expiresIn = 0;
+  successMessage = '';
 
   constructor(
     private authApi: AuthApiService,
@@ -31,8 +30,7 @@ export class ForgotPasswordComponent {
       next: (res) => {
         this.loading = false;
         this.success = true;
-        this.tempPassword = res.temp_password ?? '';
-        this.expiresIn = res.expires_in_minutes ?? 10;
+        this.successMessage = res.message || 'If an account exists, a password reset link has been sent to email.';
       },
       error: (err) => {
         this.loading = false;

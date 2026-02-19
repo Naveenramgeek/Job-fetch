@@ -23,3 +23,4 @@ class User(Base):
     jobs = relationship("Job", back_populates="user")
     search_category = relationship("SearchCategory", back_populates="users")
     job_matches = relationship("UserJobMatch", back_populates="user")
+    feedback_entries = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")

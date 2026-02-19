@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'http://127.0.0.1:8000', // set in build or use relative
+  // Use reverse proxy (same-origin) in production to avoid hardcoded insecure origins.
+  apiBaseUrl: '',
 };

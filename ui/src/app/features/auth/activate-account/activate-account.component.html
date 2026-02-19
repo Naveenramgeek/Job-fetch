@@ -1,0 +1,16 @@
+<div class="activate-page">
+  <div class="activate-card">
+    <div class="activate-header">
+      <img class="logo-icon" src="assets/jobfetch-brand-icon.svg" alt="JobFetch icon" />
+      <h1>Account activation</h1>
+      <p>Verifying your activation link</p>
+    </div>
+    <div class="activate-body">
+      <p *ngIf="loading">Activating your account...</p>
+      <p class="success-msg" *ngIf="!loading && message">{{ message }}</p>
+      <p class="error-msg" *ngIf="!loading && error">{{ error }}</p>
+      <button mat-raised-button color="primary" routerLink="/auth/login" *ngIf="!loading">Back to sign in</button>
+    </div>
+  </div>
+  <p class="app-copyright">© 2026 Naveen Vemula. All rights reserved</p>
+</div>

@@ -16,6 +16,7 @@
         </button>
         <button mat-button routerLink="/resume" routerLinkActive="active">Resume</button>
         <button mat-button routerLink="/tailor-resume" routerLinkActive="active">Tailor Resume</button>
+        <button mat-button routerLink="/feedback" routerLinkActive="active">Feedback</button>
         <button mat-button routerLink="/account" routerLinkActive="active">Profile</button>
         <button mat-button *ngIf="auth.currentUserValue?.isAdmin" routerLink="/admin" routerLinkActive="active">
           Admin
@@ -33,6 +34,10 @@
         <button mat-menu-item routerLink="/tailor-resume">
           <mat-icon>auto_fix_high</mat-icon>
           <span>Tailor Resume</span>
+        </button>
+        <button mat-menu-item routerLink="/feedback">
+          <mat-icon>feedback</mat-icon>
+          <span>Feedback</span>
         </button>
         <button mat-menu-item routerLink="/account">
           <mat-icon>person</mat-icon>

@@ -4,6 +4,7 @@ from app.models.user import User
 from app.models.resume import Resume
 from app.models.job import Job
 from app.models.user_job_match import UserJobMatch
+from app.models.feedback import Feedback
 
 __all__ = [
     "SearchCategory",
@@ -12,4 +13,5 @@ __all__ = [
     "Resume",
     "Job",
     "UserJobMatch",
+    "Feedback",
 ]

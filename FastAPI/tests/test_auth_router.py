@@ -32,6 +32,7 @@ def test_register_rejects_existing_email(monkeypatch, client):
 
 
 def test_register_success(monkeypatch, client):
+    monkeypatch.setattr(auth_mod.settings, "require_email_activation", False)
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: None)
     monkeypatch.setattr(auth_mod, "create_user", lambda db, email, pw: _User(user_id="new1", email=email))
     monkeypatch.setattr(auth_mod, "get_latest_by_user", lambda db, uid: None)
@@ -39,6 +40,22 @@ def test_register_success(monkeypatch, client):
     resp = client.post("/auth/register", json={"email": "new@example.com", "password": "password123", "confirm_password": "password123"})
     assert resp.status_code == 200
     assert resp.json()["access_token"] == "token-1"
+
+
+def test_register_requires_activation_when_enabled(monkeypatch, client):
+    created = _User(user_id="new2", email="new2@example.com", is_active=True)
+    calls = {"mail": False}
+    monkeypatch.setattr(auth_mod.settings, "require_email_activation", True)
+    monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: None)
+    monkeypatch.setattr(auth_mod, "create_user", lambda db, email, pw: created)
+    monkeypatch.setattr(auth_mod, "update_user", lambda db, uid, **kwargs: created)
+    monkeypatch.setattr(auth_mod, "create_email_action_token", lambda subject, action, expires_minutes: "act-token")
+    monkeypatch.setattr(auth_mod, "send_activation_email", lambda **kwargs: calls.update(mail=True) or True)
+
+    resp = client.post("/auth/register", json={"email": "new2@example.com", "password": "password123", "confirm_password": "password123"})
+    assert resp.status_code == 200
+    assert "check your email" in resp.json()["message"].lower()
+    assert calls["mail"] is True
 
 
 def test_login_invalid_credentials(monkeypatch, client):
@@ -51,6 +68,23 @@ def test_login_disabled_user(monkeypatch, client):
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: _User(is_active=False))
     resp = client.post("/auth/login", json={"email": "x@example.com", "password": "bad"})
     assert resp.status_code == 403
+
+
+def test_activate_account_invalid_token(client):
+    resp = client.get("/auth/activate?token=bad-token")
+    assert resp.status_code == 400
+
+
+def test_activate_account_success(monkeypatch, client):
+    user = _User(user_id="u-activate", email="active@example.com", is_active=False)
+    monkeypatch.setattr(auth_mod, "decode_email_action_token", lambda token, expected_action: "u-activate")
+    monkeypatch.setattr(auth_mod, "get_by_id", lambda db, uid: user)
+    monkeypatch.setattr(auth_mod, "update_user", lambda db, uid, **kwargs: user)
+    monkeypatch.setattr(auth_mod, "get_latest_by_user", lambda db, uid: None)
+    monkeypatch.setattr(auth_mod, "create_access_token", lambda uid: "activated-token")
+    resp = client.get("/auth/activate?token=good")
+    assert resp.status_code == 200
+    assert resp.json()["access_token"] == "activated-token"
 
 
 def test_login_temp_password_path(monkeypatch, client):
@@ -80,19 +114,48 @@ def test_forgot_password_generic_response_for_unknown(monkeypatch, client):
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: None)
     resp = client.post("/auth/forgot-password", json={"email": "none@example.com"})
     assert resp.status_code == 200
-    assert "If an account exists" in resp.json()["message"]
+    assert "password reset link" in resp.json()["message"]
 
 
-def test_forgot_password_can_expose_temp_when_enabled(monkeypatch, client):
-    user = _User()
+def test_resend_activation_generic_for_unknown(monkeypatch, client):
+    monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: None)
+    resp = client.post("/auth/resend-activation", json={"email": "none@example.com"})
+    assert resp.status_code == 200
+    assert "inactive account exists" in resp.json()["message"]
+
+
+def test_forgot_password_sends_reset_email(monkeypatch, client):
+    user = _User(user_id="u-reset")
+    called = {"mail": False}
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: user)
-    monkeypatch.setattr(auth_mod, "generate_temp_password", lambda: "TEMP1234")
-    monkeypatch.setattr(auth_mod, "hash_password", lambda x: "hashed-temp")
-    monkeypatch.setattr(auth_mod, "set_temp_password", lambda db, uid, h, e: user)
-    monkeypatch.setattr(auth_mod.settings, "expose_temp_password_in_response", True)
+    monkeypatch.setattr(auth_mod, "create_email_action_token", lambda subject, action, expires_minutes: "reset-token")
+    monkeypatch.setattr(auth_mod, "send_reset_password_email", lambda **kwargs: called.update(mail=True) or True)
     resp = client.post("/auth/forgot-password", json={"email": "u@example.com"})
     assert resp.status_code == 200
-    assert resp.json()["temp_password"] == "TEMP1234"
+    assert called["mail"] is True
+
+
+def test_reset_password_invalid_token(client):
+    resp = client.post(
+        "/auth/reset-password",
+        json={"token": "bad-token", "new_password": "newpassword1", "confirm_password": "newpassword1"},
+    )
+    assert resp.status_code == 400
+
+
+def test_reset_password_success(monkeypatch, client):
+    user = _User(user_id="u1", email="u@example.com")
+    monkeypatch.setattr(auth_mod, "decode_email_action_token", lambda token, expected_action: "u1")
+    monkeypatch.setattr(auth_mod, "get_by_id", lambda db, uid: user)
+    monkeypatch.setattr(auth_mod, "hash_password", lambda p: "hash-new")
+    monkeypatch.setattr(auth_mod, "update_user", lambda db, uid, **kwargs: user)
+    monkeypatch.setattr(auth_mod, "clear_temp_password", lambda db, uid: user)
+    resp = client.post(
+        "/auth/reset-password",
+        json={"token": "good-token", "new_password": "newpassword1", "confirm_password": "newpassword1"},
+    )
+    assert resp.status_code == 200
+    assert "updated successfully" in resp.json()["message"].lower()
 
 
 def test_change_password_requires_temp_mode(monkeypatch, client):
@@ -180,6 +243,7 @@ def test_delete_account_success(monkeypatch, client):
 
 
 def test_register_returns_500_on_unexpected_failure(monkeypatch, client):
+    monkeypatch.setattr(auth_mod.settings, "require_email_activation", False)
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: None)
     monkeypatch.setattr(auth_mod, "create_user", lambda db, email, pw: (_ for _ in ()).throw(RuntimeError("db")))
     resp = client.post("/auth/register", json={"email": "x@example.com", "password": "password123", "confirm_password": "password123"})
@@ -188,9 +252,12 @@ def test_register_returns_500_on_unexpected_failure(monkeypatch, client):
 
 def test_forgot_password_returns_500_on_failure(monkeypatch, client):
     monkeypatch.setattr(auth_mod, "get_by_email", lambda db, email: _User())
-    monkeypatch.setattr(auth_mod, "generate_temp_password", lambda: "TEMP1234")
-    monkeypatch.setattr(auth_mod, "hash_password", lambda x: "hashed-temp")
-    monkeypatch.setattr(auth_mod, "set_temp_password", lambda db, uid, h, e: (_ for _ in ()).throw(RuntimeError("db")))
+    monkeypatch.setattr(auth_mod, "create_email_action_token", lambda subject, action, expires_minutes: "reset-token")
+    monkeypatch.setattr(
+        auth_mod,
+        "send_reset_password_email",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("mail fail")),
+    )
     resp = client.post("/auth/forgot-password", json={"email": "u@example.com"})
     assert resp.status_code == 500
 

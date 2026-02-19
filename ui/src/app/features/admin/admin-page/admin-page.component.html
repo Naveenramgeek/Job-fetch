@@ -39,33 +39,16 @@
 
   <section class="actions-section">
     <h2>Actions</h2>
-    <div class="pipeline-status" *ngIf="pipelineStatus">
-      <span class="status-badge" [class.running]="pipelineStatus.running" [class.stopped]="!pipelineStatus.running">
-        {{ pipelineStatus.running ? 'Running every ' + pipelineStatus.interval_hours + ' h' : 'Stopped' }}
-      </span>
-      <span class="status-detail" *ngIf="pipelineStatus.last_run">Last run: {{ formatDate(pipelineStatus.last_run) }}</span>
-      <span class="status-detail" *ngIf="pipelineStatus.running && pipelineStatus.next_run">Next run: {{ formatDate(pipelineStatus.next_run) }}</span>
-    </div>
     <div class="action-buttons">
       <button
         mat-raised-button
         color="primary"
         (click)="runPipeline()"
-        [disabled]="startStopLoading || (pipelineStatus?.running ?? false)"
+        [disabled]="pipelineRunLoading"
       >
-        <mat-spinner *ngIf="startStopLoading" diameter="20" class="btn-spinner"></mat-spinner>
-        <mat-icon *ngIf="!startStopLoading">play_arrow</mat-icon>
-        Run job pipeline
-      </button>
-      <button
-        mat-raised-button
-        color="warn"
-        (click)="stopPipeline()"
-        [disabled]="startStopLoading || !(pipelineStatus?.running ?? false)"
-      >
-        <mat-spinner *ngIf="startStopLoading" diameter="20" class="btn-spinner"></mat-spinner>
-        <mat-icon *ngIf="!startStopLoading">stop</mat-icon>
-        Stop job pipeline
+        <mat-spinner *ngIf="pipelineRunLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!pipelineRunLoading">play_arrow</mat-icon>
+        Run pipeline once now
       </button>
       <button
         mat-stroked-button
@@ -76,13 +59,61 @@
         <mat-icon *ngIf="!seedLoading">category</mat-icon>
         {{ seedLoading ? 'Seeding...' : 'Seed Categories' }}
       </button>
+      <button mat-stroked-button (click)="toggleAdvancedPanel()">
+        <mat-icon>{{ advancedPanelOpen ? 'expand_less' : 'expand_more' }}</mat-icon>
+        Advanced pipeline controls
+      </button>
     </div>
-    <p class="success-msg" *ngIf="startStopMessage">{{ startStopMessage }}</p>
+    <p class="success-msg" *ngIf="pipelineRunMessage">{{ pipelineRunMessage }}</p>
+    <p class="success-msg" *ngIf="recurringMessage">{{ recurringMessage }}</p>
     <p class="success-msg" *ngIf="seedMessage">{{ seedMessage }}</p>
     <p class="error-msg" *ngIf="pipelineError">{{ pipelineError }}</p>
+
+    <div class="advanced-panel" *ngIf="advancedPanelOpen">
+      <h3>Recurring Scheduler</h3>
+      <div class="pipeline-status" *ngIf="pipelineStatus">
+        <span class="status-badge" [class.running]="pipelineStatus.running" [class.stopped]="!pipelineStatus.running">
+          {{ pipelineStatus.running ? 'Running every ' + pipelineStatus.interval_hours + ' h' : 'Stopped' }}
+        </span>
+        <span class="status-detail" *ngIf="pipelineStatus.last_run">Last run: {{ formatDate(pipelineStatus.last_run) }}</span>
+        <span class="status-detail" *ngIf="pipelineStatus.running && pipelineStatus.next_run">Next run: {{ formatDate(pipelineStatus.next_run) }}</span>
+      </div>
+      <div class="action-buttons">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="startRecurringPipeline()"
+          [disabled]="recurringLoading || !!pipelineStatus?.running"
+        >
+          <mat-spinner *ngIf="recurringLoading" diameter="20" class="btn-spinner"></mat-spinner>
+          <mat-icon *ngIf="!recurringLoading">play_arrow</mat-icon>
+          Start recurring
+        </button>
+        <button
+          mat-raised-button
+          color="warn"
+          (click)="stopRecurringPipeline()"
+          [disabled]="recurringLoading || !pipelineStatus?.running"
+        >
+          <mat-spinner *ngIf="recurringLoading" diameter="20" class="btn-spinner"></mat-spinner>
+          <mat-icon *ngIf="!recurringLoading">stop</mat-icon>
+          Stop recurring
+        </button>
+      </div>
+      <p class="advanced-note">
+        Use "Run pipeline once now" for manual runs. Recurring controls are optional and run on scheduler state.
+      </p>
+    </div>
   </section>
 
-  <section class="users-section">
+  <div class="admin-tabs">
+    <button mat-stroked-button [class.tab-active]="selectedTab === tabUsers" (click)="selectTab(tabUsers)">Users</button>
+    <button mat-stroked-button [class.tab-active]="selectedTab === tabJobs" (click)="selectTab(tabJobs)">Job Listings</button>
+    <button mat-stroked-button [class.tab-active]="selectedTab === tabOldJobs" (click)="selectTab(tabOldJobs)">Jobs &gt; 24h</button>
+    <button mat-stroked-button [class.tab-active]="selectedTab === tabFeedback" (click)="selectTab(tabFeedback)">Feedback</button>
+  </div>
+
+  <section class="users-section" *ngIf="selectedTab === tabUsers">
     <h2>Users</h2>
     <div class="section-actions search-and-pagination">
       <mat-form-field appearance="outline" class="search-field">
@@ -170,6 +201,10 @@
           <th mat-header-cell *matHeaderCellDef>Created</th>
           <td mat-cell *matCellDef="let u">{{ formatDate(u.created_at) }}</td>
         </ng-container>
+        <ng-container matColumnDef="matched_jobs_count">
+          <th mat-header-cell *matHeaderCellDef>Associated Jobs</th>
+          <td mat-cell *matCellDef="let u">{{ u.matched_jobs_count ?? 0 }}</td>
+        </ng-container>
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef>Actions</th>
           <td mat-cell *matCellDef="let u">
@@ -181,14 +216,14 @@
             </button>
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="['email', 'is_active', 'is_admin', 'created_at', 'actions']"></tr>
-        <tr mat-row *matRowDef="let row; columns: ['email', 'is_active', 'is_admin', 'created_at', 'actions']"></tr>
+        <tr mat-header-row *matHeaderRowDef="['email', 'is_active', 'is_admin', 'matched_jobs_count', 'created_at', 'actions']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['email', 'is_active', 'is_admin', 'matched_jobs_count', 'created_at', 'actions']"></tr>
       </table>
     </div>
     <p *ngIf="!users.length && !loading">No users yet.</p>
   </section>
 
-  <section class="job-listings-section">
+  <section class="job-listings-section" *ngIf="selectedTab === tabJobs">
     <h2>Job listings</h2>
     <div class="section-actions search-and-pagination">
       <mat-form-field appearance="outline" class="search-field">
@@ -312,9 +347,19 @@
     <p *ngIf="!jobListings.length && !loading">No job listings. Seed categories first, or run the pipeline.</p>
   </section>
 
-  <section class="job-listings-section">
+  <section class="job-listings-section" *ngIf="selectedTab === tabOldJobs">
     <h2>Old job listings (&gt;24h)</h2>
     <div class="section-actions search-and-pagination">
+      <button
+        mat-raised-button
+        color="warn"
+        (click)="deleteOldJobs()"
+        [disabled]="deleteOldJobsLoading || oldJobTotal === 0"
+      >
+        <mat-spinner *ngIf="deleteOldJobsLoading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!deleteOldJobsLoading">delete_sweep</mat-icon>
+        Delete all old jobs
+      </button>
       <span class="pagination-info">{{ oldJobTotal ? 'Showing ' + ((oldJobPage - 1) * oldJobPageSize + 1) + '–' + min(oldJobPage * oldJobPageSize, oldJobTotal) + ' of ' + oldJobTotal : '0 of 0' }}</span>
       <mat-form-field appearance="outline" class="page-size-field">
         <mat-label>Per page</mat-label>
@@ -362,5 +407,65 @@
       </table>
     </div>
     <p *ngIf="!oldJobListings.length && !loading">No old job listings found.</p>
+  </section>
+
+  <section class="job-listings-section" *ngIf="selectedTab === tabFeedback">
+    <h2>User feedback</h2>
+    <div class="section-actions search-and-pagination">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search feedback</mat-label>
+        <input matInput [(ngModel)]="feedbackSearch" name="feedbackSearch" (keyup.enter)="onFeedbackSearch()" />
+        <button mat-icon-button matSuffix (click)="onFeedbackSearch()" matTooltip="Search">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+      <button mat-raised-button (click)="onFeedbackSearch()">Search</button>
+      <span class="pagination-info">{{ feedbackTotal ? 'Showing ' + ((feedbackPage - 1) * feedbackPageSize + 1) + '–' + min(feedbackPage * feedbackPageSize, feedbackTotal) + ' of ' + feedbackTotal : '0 of 0' }}</span>
+      <mat-form-field appearance="outline" class="page-size-field">
+        <mat-label>Per page</mat-label>
+        <mat-select [(ngModel)]="feedbackPageSize" (selectionChange)="onFeedbackPageSizeChange()" name="feedbackPageSize">
+          <mat-option [value]="10">10</mat-option>
+          <mat-option [value]="20">20</mat-option>
+          <mat-option [value]="50">50</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <button mat-icon-button (click)="onFeedbackPageChange(feedbackPage - 1)" [disabled]="feedbackPage <= 1" matTooltip="Previous">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-icon-button (click)="onFeedbackPageChange(feedbackPage + 1)" [disabled]="feedbackPage * feedbackPageSize >= feedbackTotal" matTooltip="Next">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+    <div class="job-listings-table-wrap">
+      <table class="users-table feedback-table" mat-table [dataSource]="feedbackItems">
+        <ng-container matColumnDef="user_email">
+          <th mat-header-cell *matHeaderCellDef>User</th>
+          <td mat-cell *matCellDef="let f">{{ f.user_email }}</td>
+        </ng-container>
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let f">{{ f.category || 'General' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="rating">
+          <th mat-header-cell *matHeaderCellDef>Rating</th>
+          <td mat-cell *matCellDef="let f">{{ f.rating ? (f.rating + '/5') : '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="message">
+          <th mat-header-cell *matHeaderCellDef>Feedback</th>
+          <td mat-cell *matCellDef="let f">{{ f.message }}</td>
+        </ng-container>
+        <ng-container matColumnDef="page">
+          <th mat-header-cell *matHeaderCellDef>Page</th>
+          <td mat-cell *matCellDef="let f">{{ f.page || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="created_at">
+          <th mat-header-cell *matHeaderCellDef>Submitted</th>
+          <td mat-cell *matCellDef="let f">{{ formatDate(f.created_at) }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="['user_email', 'category', 'rating', 'message', 'page', 'created_at']"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['user_email', 'category', 'rating', 'message', 'page', 'created_at']"></tr>
+      </table>
+    </div>
+    <p *ngIf="!feedbackItems.length && !loading">No feedback submitted yet.</p>
   </section>
 </div>

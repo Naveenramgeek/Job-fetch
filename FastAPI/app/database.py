@@ -33,6 +33,7 @@ def init_db():
         Resume,
         Job,
         UserJobMatch,
+        Feedback,
     )
 
     try:
@@ -52,6 +53,7 @@ def ensure_tables_exist():
         Resume,
         Job,
         UserJobMatch,
+        Feedback,
     )
 
     try:

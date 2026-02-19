@@ -29,6 +29,7 @@ export class ResumeTailorPageComponent implements OnInit, AfterViewInit, OnDestr
   alertVisible = false;
   alertType: AlertType = 'success';
   alertMessage = '';
+  showEditorTipPopup = true;
   pdfPreviewUrl: SafeResourceUrl | null = null;
   private pdfObjectUrl: string | null = null;
   private editorView: EditorView | null = null;
@@ -172,6 +173,10 @@ export class ResumeTailorPageComponent implements OnInit, AfterViewInit, OnDestr
   closeAlert(): void {
     this.clearAlertTimer();
     this.alertVisible = false;
+  }
+
+  closeEditorTipPopup(): void {
+    this.showEditorTipPopup = false;
   }
 
   private showAlert(type: AlertType, message: string): void {

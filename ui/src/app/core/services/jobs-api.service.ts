@@ -22,6 +22,11 @@ export interface JobMatchResultDto {
 export interface JobsResponseDto {
   active: JobMatchResultDto[];
   applied: JobMatchResultDto[];
+  active_total?: number;
+  applied_total?: number;
+  pending_page?: number;
+  applied_page?: number;
+  page_size?: number;
 }
 
 export interface TailoredResumeDto {
@@ -38,8 +43,22 @@ export class JobsApiService {
   constructor(private http: HttpClient) {}
 
   /** Get LLM-matched jobs for the user (active + applied). */
-  getJobs(): Observable<JobsResponseDto> {
-    return this.http.get<JobsResponseDto>(this.base);
+  getJobs(params?: {
+    pending_page?: number;
+    applied_page?: number;
+    page_size?: number;
+    pending_search?: string;
+    applied_search?: string;
+  }): Observable<JobsResponseDto> {
+    const p = params || {};
+    const query: string[] = [];
+    if (p.pending_page != null) query.push(`pending_page=${p.pending_page}`);
+    if (p.applied_page != null) query.push(`applied_page=${p.applied_page}`);
+    if (p.page_size != null) query.push(`page_size=${p.page_size}`);
+    if (p.pending_search != null && p.pending_search !== '') query.push(`pending_search=${encodeURIComponent(p.pending_search)}`);
+    if (p.applied_search != null && p.applied_search !== '') query.push(`applied_search=${encodeURIComponent(p.applied_search)}`);
+    const qs = query.length ? `?${query.join('&')}` : '';
+    return this.http.get<JobsResponseDto>(`${this.base}${qs}`);
   }
 
   /** Get active (pending) jobs only. */

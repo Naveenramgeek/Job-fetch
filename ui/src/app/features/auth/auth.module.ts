@@ -13,10 +13,12 @@ import { LoginComponent } from './login/login.component';
 import { SignupComponent } from './signup/signup.component';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
 import { ChangePasswordComponent } from './change-password/change-password.component';
+import { ActivateAccountComponent } from './activate-account/activate-account.component';
+import { ResetPasswordComponent } from './reset-password/reset-password.component';
 import { AuthRoutingModule } from './auth-routing.module';
 
 @NgModule({
-  declarations: [LoginComponent, SignupComponent, ForgotPasswordComponent, ChangePasswordComponent],
+  declarations: [LoginComponent, SignupComponent, ForgotPasswordComponent, ChangePasswordComponent, ActivateAccountComponent, ResetPasswordComponent],
   imports: [
     CommonModule,
     FormsModule,

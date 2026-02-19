@@ -7,8 +7,11 @@ import {
   AdminCategory,
   AdminJobListing,
   AdminJobListingCreate,
+  AdminFeedbackItem,
   PipelineStatus,
 } from '../../../core/services/admin-api.service';
+import { MatDialog } from '@angular/material/dialog';
+import { ConfirmActionDialogComponent } from '../confirm-action-dialog/confirm-action-dialog.component';
 
 @Component({
   selector: 'app-admin-page',
@@ -16,17 +19,26 @@ import {
   styleUrls: ['./admin-page.component.scss'],
 })
 export class AdminPageComponent implements OnInit {
+  readonly tabUsers: 'users' = 'users';
+  readonly tabJobs: 'jobs' = 'jobs';
+  readonly tabOldJobs: 'old_jobs' = 'old_jobs';
+  readonly tabFeedback: 'feedback' = 'feedback';
+  selectedTab: 'users' | 'jobs' | 'old_jobs' | 'feedback' = 'users';
   stats: AdminStats | null = null;
   users: AdminUser[] = [];
   categories: AdminCategory[] = [];
   jobListings: AdminJobListing[] = [];
   oldJobListings: AdminJobListing[] = [];
+  feedbackItems: AdminFeedbackItem[] = [];
   loading = false;
   error = '';
   pipelineError = '';
+  pipelineRunLoading = false;
+  pipelineRunMessage = '';
+  advancedPanelOpen = false;
   pipelineStatus: PipelineStatus | null = null;
-  startStopLoading = false;
-  startStopMessage = '';
+  recurringLoading = false;
+  recurringMessage = '';
   seedLoading = false;
   seedMessage = '';
 
@@ -66,8 +78,16 @@ export class AdminPageComponent implements OnInit {
   oldJobPageSize = 20;
   oldJobTotal = 0;
   deleteAllJobsLoading = false;
+  deleteOldJobsLoading = false;
+  feedbackSearch = '';
+  feedbackPage = 1;
+  feedbackPageSize = 20;
+  feedbackTotal = 0;
 
-  constructor(private adminApi: AdminApiService) {}
+  constructor(
+    private adminApi: AdminApiService,
+    private dialog: MatDialog,
+  ) {}
 
   ngOnInit(): void {
     this.loadStats();
@@ -76,6 +96,18 @@ export class AdminPageComponent implements OnInit {
     this.loadCategories();
     this.loadJobListings();
     this.loadOldJobListings();
+    this.loadFeedback();
+  }
+
+  selectTab(tab: 'users' | 'jobs' | 'old_jobs' | 'feedback'): void {
+    this.selectedTab = tab;
+  }
+
+  toggleAdvancedPanel(): void {
+    this.advancedPanelOpen = !this.advancedPanelOpen;
+    if (this.advancedPanelOpen) {
+      this.loadPipelineStatus();
+    }
   }
 
   loadPipelineStatus(): void {
@@ -130,36 +162,55 @@ export class AdminPageComponent implements OnInit {
   }
 
   runPipeline(): void {
-    this.startStopLoading = true;
+    this.pipelineRunLoading = true;
     this.pipelineError = '';
-    this.startStopMessage = '';
-    this.adminApi.startPipeline().subscribe({
-      next: (res) => {
-        this.startStopMessage = res.message;
-        this.startStopLoading = false;
-        this.loadPipelineStatus();
+    this.pipelineRunMessage = '';
+    this.adminApi.runPipeline().subscribe({
+      next: () => {
+        this.pipelineRunMessage = 'Pipeline run completed successfully.';
+        this.pipelineRunLoading = false;
         this.loadStats();
+        this.loadPipelineStatus();
+        this.loadJobListings();
+        this.loadOldJobListings();
       },
       error: (err) => {
         this.pipelineError = err.error?.detail || err.message || 'Failed to start pipeline';
-        this.startStopLoading = false;
+        this.pipelineRunLoading = false;
       },
     });
   }
 
-  stopPipeline(): void {
-    this.startStopLoading = true;
+  startRecurringPipeline(): void {
+    this.recurringLoading = true;
     this.pipelineError = '';
-    this.startStopMessage = '';
-    this.adminApi.stopPipeline().subscribe({
+    this.recurringMessage = '';
+    this.adminApi.startPipeline().subscribe({
       next: (res) => {
-        this.startStopMessage = res.message;
-        this.startStopLoading = false;
+        this.recurringLoading = false;
+        this.recurringMessage = res.message;
         this.loadPipelineStatus();
       },
       error: (err) => {
-        this.pipelineError = err.error?.detail || err.message || 'Failed to stop pipeline';
-        this.startStopLoading = false;
+        this.recurringLoading = false;
+        this.pipelineError = err.error?.detail || err.message || 'Failed to start recurring pipeline';
+      },
+    });
+  }
+
+  stopRecurringPipeline(): void {
+    this.recurringLoading = true;
+    this.pipelineError = '';
+    this.recurringMessage = '';
+    this.adminApi.stopPipeline().subscribe({
+      next: (res) => {
+        this.recurringLoading = false;
+        this.recurringMessage = res.message;
+        this.loadPipelineStatus();
+      },
+      error: (err) => {
+        this.recurringLoading = false;
+        this.pipelineError = err.error?.detail || err.message || 'Failed to stop recurring pipeline';
       },
     });
   }
@@ -278,15 +329,22 @@ export class AdminPageComponent implements OnInit {
   }
 
   deleteUser(u: AdminUser): void {
-    if (!confirm(`Delete user ${u.email}? This cannot be undone.`)) return;
-    this.adminApi.deleteUser(u.id).subscribe({
-      next: () => {
-        this.loadStats();
-        this.loadUsers();
-      },
-      error: (err) => {
-        this.error = err.error?.detail || err.message || 'Delete failed';
-      },
+    this.openConfirmDialog({
+      title: 'Delete user',
+      message: `Delete user ${u.email}? This cannot be undone.`,
+      confirmText: 'Delete user',
+      isDanger: true,
+    }).afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.adminApi.deleteUser(u.id).subscribe({
+        next: () => {
+          this.loadStats();
+          this.loadUsers();
+        },
+        error: (err) => {
+          this.error = err.error?.detail || err.message || 'Delete failed';
+        },
+      });
     });
   }
 
@@ -331,6 +389,40 @@ export class AdminPageComponent implements OnInit {
       });
   }
 
+  loadFeedback(): void {
+    this.adminApi
+      .getFeedback({
+        search: this.feedbackSearch || undefined,
+        page: this.feedbackPage,
+        page_size: this.feedbackPageSize,
+      })
+      .subscribe({
+        next: (res) => {
+          this.feedbackItems = res.items;
+          this.feedbackTotal = res.total;
+        },
+        error: () => {
+          this.feedbackItems = [];
+          this.feedbackTotal = 0;
+        },
+      });
+  }
+
+  onFeedbackSearch(): void {
+    this.feedbackPage = 1;
+    this.loadFeedback();
+  }
+
+  onFeedbackPageChange(page: number): void {
+    this.feedbackPage = page;
+    this.loadFeedback();
+  }
+
+  onFeedbackPageSizeChange(): void {
+    this.feedbackPage = 1;
+    this.loadFeedback();
+  }
+
   onJobCategoryFilterChange(): void {
     this.jobPage = 1;
     this.oldJobPage = 1;
@@ -366,21 +458,52 @@ export class AdminPageComponent implements OnInit {
   }
 
   deleteAllJobs(): void {
-    if (!confirm('Delete ALL job listings in the database? This cannot be undone.')) return;
-    this.deleteAllJobsLoading = true;
-    this.adminApi.deleteAllJobListings().subscribe({
-      next: (res) => {
-        this.deleteAllJobsLoading = false;
-        this.jobListings = [];
-        this.jobTotal = 0;
-        this.oldJobListings = [];
-        this.oldJobTotal = 0;
-        this.loadStats();
-      },
-      error: (err) => {
-        this.deleteAllJobsLoading = false;
-        this.error = err.error?.detail || err.message || 'Delete all failed';
-      },
+    this.openConfirmDialog({
+      title: 'Delete all job listings',
+      message: 'Delete all job listings in the database? This cannot be undone.',
+      confirmText: 'Delete all',
+      isDanger: true,
+    }).afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.deleteAllJobsLoading = true;
+      this.adminApi.deleteAllJobListings().subscribe({
+        next: () => {
+          this.deleteAllJobsLoading = false;
+          this.jobListings = [];
+          this.jobTotal = 0;
+          this.oldJobListings = [];
+          this.oldJobTotal = 0;
+          this.loadStats();
+        },
+        error: (err) => {
+          this.deleteAllJobsLoading = false;
+          this.error = err.error?.detail || err.message || 'Delete all failed';
+        },
+      });
+    });
+  }
+
+  deleteOldJobs(): void {
+    this.openConfirmDialog({
+      title: 'Delete old jobs',
+      message: 'Delete all job listings older than 24 hours? This cannot be undone.',
+      confirmText: 'Delete old jobs',
+      isDanger: true,
+    }).afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.deleteOldJobsLoading = true;
+      this.adminApi.deleteOldJobListings().subscribe({
+        next: () => {
+          this.deleteOldJobsLoading = false;
+          this.loadStats();
+          this.loadJobListings();
+          this.loadOldJobListings();
+        },
+        error: (err) => {
+          this.deleteOldJobsLoading = false;
+          this.error = err.error?.detail || err.message || 'Delete old jobs failed';
+        },
+      });
     });
   }
 
@@ -465,16 +588,23 @@ export class AdminPageComponent implements OnInit {
   }
 
   deleteJob(j: AdminJobListing): void {
-    if (!confirm(`Delete job listing "${j.title}" at ${j.company}?`)) return;
-    this.adminApi.deleteJobListing(j.id).subscribe({
-      next: () => {
-        this.loadStats();
-        this.loadJobListings();
-        this.loadOldJobListings();
-      },
-      error: (err) => {
-        this.error = err.error?.detail || err.message || 'Delete failed';
-      },
+    this.openConfirmDialog({
+      title: 'Delete job listing',
+      message: `Delete job listing "${j.title}" at ${j.company}?`,
+      confirmText: 'Delete listing',
+      isDanger: true,
+    }).afterClosed().subscribe((confirmed) => {
+      if (!confirmed) return;
+      this.adminApi.deleteJobListing(j.id).subscribe({
+        next: () => {
+          this.loadStats();
+          this.loadJobListings();
+          this.loadOldJobListings();
+        },
+        error: (err) => {
+          this.error = err.error?.detail || err.message || 'Delete failed';
+        },
+      });
     });
   }
 
@@ -491,5 +621,24 @@ export class AdminPageComponent implements OnInit {
   /** For template: show "X–Y of total" pagination range. */
   min(a: number, b: number): number {
     return Math.min(a, b);
+  }
+
+  private openConfirmDialog(data: {
+    title: string;
+    message: string;
+    confirmText?: string;
+    isDanger?: boolean;
+  }) {
+    return this.dialog.open(ConfirmActionDialogComponent, {
+      width: '420px',
+      disableClose: false,
+      data: {
+        title: data.title,
+        message: data.message,
+        confirmText: data.confirmText || 'Confirm',
+        cancelText: 'Cancel',
+        isDanger: data.isDanger ?? false,
+      },
+    });
   }
 }

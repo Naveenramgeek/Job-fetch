@@ -87,13 +87,24 @@ def test_start_pipeline_already_running(monkeypatch, admin_client):
 
 
 def test_get_matched_jobs_and_applied(monkeypatch, client):
-    monkeypatch.setattr(jobs_mod, "get_matches_for_user", lambda db, uid, status, limit: [_Match(with_job=True), _Match(with_job=False)])
+    monkeypatch.setattr(
+        jobs_mod,
+        "get_matches_for_user",
+        lambda db, uid, status, search=None, limit=100, offset=0: [_Match(with_job=True), _Match(with_job=False)],
+    )
+    monkeypatch.setattr(
+        jobs_mod,
+        "get_match_count_for_user",
+        lambda db, uid, status, search=None: 16 if status == "pending" else 8,
+    )
     r1 = client.get("/jobs/matched")
     r2 = client.get("/jobs/applied")
     r3 = client.get("/jobs")
     assert r1.status_code == 200 and len(r1.json()) == 1
     assert r2.status_code == 200 and len(r2.json()) == 1
     assert r3.status_code == 200 and len(r3.json()["active"]) == 1
+    assert r3.json()["active_total"] == 16
+    assert r3.json()["applied_total"] == 8
 
 
 def test_delete_match_not_found(monkeypatch, client):

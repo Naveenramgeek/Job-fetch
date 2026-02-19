@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -12,11 +13,18 @@ export class LoginComponent {
   password = '';
   loading = false;
   error = '';
+  banner = '';
 
   constructor(
     private auth: AuthService,
+    private route: ActivatedRoute,
     private router: Router,
-  ) {}
+  ) {
+    const activationRequired = this.route.snapshot.queryParamMap.get('activation_required');
+    if (activationRequired === '1') {
+      this.banner = 'Account created. Please activate your account from the email link, then come back and sign in.';
+    }
+  }
 
   onSubmit(): void {
     this.error = '';

@@ -17,6 +17,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { ResumeRoutingModule } from './resume-routing.module';
 import { ResumePageComponent } from './resume-page/resume-page.component';
@@ -29,6 +30,7 @@ import { SkillsSectionComponent } from './sections/skills-section/skills-section
 import { CertificationsSectionComponent } from './sections/certifications-section/certifications-section.component';
 import { OtherSectionComponent } from './sections/other-section/other-section.component';
 import { CustomSectionsComponent } from './sections/custom-sections/custom-sections.component';
+import { UnsavedResumeWarningDialogComponent } from './unsaved-resume-warning-dialog/unsaved-resume-warning-dialog.component';
 
 @NgModule({
   declarations: [
@@ -42,6 +44,7 @@ import { CustomSectionsComponent } from './sections/custom-sections/custom-secti
     CertificationsSectionComponent,
     OtherSectionComponent,
     CustomSectionsComponent,
+    UnsavedResumeWarningDialogComponent,
   ],
   imports: [
     CommonModule,
@@ -63,6 +66,7 @@ import { CustomSectionsComponent } from './sections/custom-sections/custom-secti
     MatDividerModule,
     MatTooltipModule,
     MatSelectModule,
+    MatDialogModule,
   ],
 })
 export class ResumeModule {}

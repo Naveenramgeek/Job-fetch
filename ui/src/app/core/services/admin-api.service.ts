@@ -18,6 +18,7 @@ export interface AdminUser {
   is_active: boolean;
   is_admin: boolean;
   search_category_id: string | null;
+  matched_jobs_count?: number;
   created_at: string | null;
 }
 
@@ -88,6 +89,17 @@ export interface PipelineStatus {
   interval_hours: number;
 }
 
+export interface AdminFeedbackItem {
+  id: string;
+  user_id: string;
+  user_email: string;
+  category: string | null;
+  message: string;
+  rating: number | null;
+  page: string | null;
+  created_at: string | null;
+}
+
 export interface AdminUsersResponse {
   items: AdminUser[];
   total: number;
@@ -95,6 +107,11 @@ export interface AdminUsersResponse {
 
 export interface AdminJobListingsResponse {
   items: AdminJobListing[];
+  total: number;
+}
+
+export interface AdminFeedbackResponse {
+  items: AdminFeedbackItem[];
   total: number;
 }
 
@@ -191,6 +208,10 @@ export class AdminApiService {
     return this.http.delete<{ message: string; deleted: number }>(`${this.base}/job-listings`);
   }
 
+  deleteOldJobListings(): Observable<{ message: string; deleted: number }> {
+    return this.http.delete<{ message: string; deleted: number }>(`${this.base}/job-listings/older-than-24h/all`);
+  }
+
   seedCategories(): Observable<{ message: string; categories: { slug: string; display_name: string }[] }> {
     return this.http.post<{ message: string; categories: { slug: string; display_name: string }[] }>(
       `${this.base}/seed-categories`,
@@ -212,5 +233,15 @@ export class AdminApiService {
 
   getPipelineStatus(): Observable<PipelineStatus> {
     return this.http.get<PipelineStatus>(`${this.jobsBase}/pipeline-status`);
+  }
+
+  getFeedback(params?: { search?: string; page?: number; page_size?: number }): Observable<AdminFeedbackResponse> {
+    const p = params || {};
+    const query: string[] = [];
+    if (p.search != null && p.search !== '') query.push(`search=${encodeURIComponent(p.search)}`);
+    if (p.page != null) query.push(`page=${p.page}`);
+    if (p.page_size != null) query.push(`page_size=${p.page_size}`);
+    const qs = query.length ? '?' + query.join('&') : '';
+    return this.http.get<AdminFeedbackResponse>(`${this.base}/feedback${qs}`);
   }
 }

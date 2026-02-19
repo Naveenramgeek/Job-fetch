@@ -28,6 +28,7 @@ export class TailorResumePageComponent implements AfterViewInit, OnDestroy {
   alertVisible = false;
   alertType: AlertType = 'success';
   alertMessage = '';
+  showEditorTipPopup = true;
   pdfPreviewUrl: SafeResourceUrl | null = null;
   private pdfObjectUrl: string | null = null;
   private editorView: EditorView | null = null;
@@ -120,6 +121,10 @@ export class TailorResumePageComponent implements AfterViewInit, OnDestroy {
 
   showInputs(): void {
     this.showJdForm = true;
+  }
+
+  closeEditorTipPopup(): void {
+    this.showEditorTipPopup = false;
   }
 
   closeAlert(): void {

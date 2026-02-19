@@ -140,6 +140,26 @@ def delete_all(db: Session) -> int:
     return count
 
 
+def delete_older_than_hours(db: Session, hours: int = 24) -> int:
+    """Delete job listings older than given hours. Returns count deleted."""
+    from sqlalchemy import delete as sql_delete
+    from app.models.user_job_match import UserJobMatch
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    old_ids = [
+        row[0]
+        for row in db.query(JobListing.id)
+        .filter(JobListing.created_at < cutoff)
+        .all()
+    ]
+    if not old_ids:
+        return 0
+    db.execute(sql_delete(UserJobMatch).where(UserJobMatch.job_listing_id.in_(old_ids)))
+    db.execute(sql_delete(JobListing).where(JobListing.id.in_(old_ids)))
+    db.commit()
+    return len(old_ids)
+
+
 def get_by_id(db: Session, listing_id: str) -> JobListing | None:
     return db.query(JobListing).filter(JobListing.id == listing_id).first()
 

@@ -1,4 +1,5 @@
 .shell {
+  --shell-header-height: 72px;
   min-height: 100vh;
   width: 100%;
   display: flex;
@@ -8,8 +9,10 @@
 }
 
 .shell-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   background: rgba(15, 20, 25, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -118,7 +121,7 @@
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
-  padding: 1.5rem 1rem;
+  padding: calc(var(--shell-header-height) + 1.5rem) 1rem 1.5rem;
 }
 
 .shell-footer {
@@ -126,6 +129,10 @@
 }
 
 @media (max-width: 900px) {
+  .shell {
+    --shell-header-height: 64px;
+  }
+
   .shell-inner {
     gap: 0.35rem;
     padding: 0.5rem 0.75rem;
@@ -165,7 +172,7 @@
 
   .shell-main {
     max-width: none;
-    padding: 0.9rem 0.7rem 1.1rem;
+    padding: calc(var(--shell-header-height) + 0.9rem) 0.7rem 1.1rem;
   }
 
   .shell-footer {

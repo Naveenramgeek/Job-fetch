@@ -4,6 +4,8 @@ import { LoginComponent } from './login/login.component';
 import { SignupComponent } from './signup/signup.component';
 import { ForgotPasswordComponent } from './forgot-password/forgot-password.component';
 import { ChangePasswordComponent } from './change-password/change-password.component';
+import { ActivateAccountComponent } from './activate-account/activate-account.component';
+import { ResetPasswordComponent } from './reset-password/reset-password.component';
 import { changePasswordGuard } from '../../core/guards/change-password.guard';
 import { guestGuard } from '../../core/guards/guest.guard';
 
@@ -11,7 +13,9 @@ const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent, canActivate: [guestGuard] },
   { path: 'signup', component: SignupComponent, canActivate: [guestGuard] },
+  { path: 'activate', component: ActivateAccountComponent },
   { path: 'forgot-password', component: ForgotPasswordComponent, canActivate: [guestGuard] },
+  { path: 'reset-password', component: ResetPasswordComponent, canActivate: [guestGuard] },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [changePasswordGuard] },
 ];
 

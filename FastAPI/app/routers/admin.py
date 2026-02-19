@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db, init_db
@@ -16,9 +17,12 @@ from app.repos.job_listing_repo import (
     update_one as update_job_listing,
     delete_one as delete_job_listing,
     delete_all as delete_all_job_listings,
+    delete_older_than_hours as delete_old_job_listings,
 )
+from app.repos.feedback_repo import get_feedback_paginated
 from app.core.security import hash_password
 from app.models.job_listing import JobListing
+from app.models.user_job_match import UserJobMatch
 from pydantic import BaseModel, EmailStr
 
 logger = logging.getLogger(__name__)
@@ -60,16 +64,28 @@ class AdminJobListingUpdate(BaseModel):
     search_category_id: str | None = None
 
 
+class AdminFeedbackResponse(BaseModel):
+    id: str
+    user_id: str
+    user_email: str
+    category: str | None = None
+    message: str
+    rating: int | None = None
+    page: str | None = None
+    created_at: str | None = None
+
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def _user_to_response(u: User) -> dict:
+def _user_to_response(u: User, matched_jobs_count: int = 0) -> dict:
     return {
         "id": u.id,
         "email": u.email,
         "is_active": u.is_active,
         "is_admin": getattr(u, "is_admin", False),
         "search_category_id": u.search_category_id,
+        "matched_jobs_count": matched_jobs_count,
         "created_at": u.created_at.isoformat() if u.created_at else None,
     }
 
@@ -87,6 +103,35 @@ def _job_listing_to_response(j: JobListing) -> dict:
         "posted_at": j.posted_at,
         "created_at": j.created_at.isoformat() if j.created_at else None,
     }
+
+
+def _safe_match_counts_for_users(db: Session, user_ids: list[str]) -> dict[str, int]:
+    if not user_ids or not hasattr(db, "query"):
+        return {}
+    try:
+        counts = (
+            db.query(UserJobMatch.user_id, func.count(UserJobMatch.id))
+            .filter(UserJobMatch.user_id.in_(user_ids))
+            .group_by(UserJobMatch.user_id)
+            .all()
+        )
+        return {uid: cnt for uid, cnt in counts}
+    except Exception:
+        return {}
+
+
+def _safe_match_count_for_user(db: Session, user_id: str) -> int:
+    if not hasattr(db, "query"):
+        return 0
+    try:
+        return (
+            db.query(func.count(UserJobMatch.id))
+            .filter(UserJobMatch.user_id == user_id)
+            .scalar()
+            or 0
+        )
+    except Exception:
+        return 0
 
 
 @router.get("/stats")
@@ -115,7 +160,9 @@ def list_users(
     page_size = min(max(1, page_size), 100)
     offset = (page - 1) * page_size
     users, total = get_all_users_paginated(db, search=search, limit=page_size, offset=offset)
-    return {"items": [_user_to_response(u) for u in users], "total": total}
+    user_ids = [u.id for u in users]
+    counts_map = _safe_match_counts_for_users(db, user_ids)
+    return {"items": [_user_to_response(u, matched_jobs_count=counts_map.get(u.id, 0)) for u in users], "total": total}
 
 
 @router.get("/users/{user_id}")
@@ -128,7 +175,8 @@ def get_user(
     target = get_by_id(db, user_id)
     if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return _user_to_response(target)
+    matched_jobs_count = _safe_match_count_for_user(db, target.id)
+    return _user_to_response(target, matched_jobs_count=matched_jobs_count)
 
 
 @router.post("/users")
@@ -366,3 +414,39 @@ def delete_job_listing_admin(
     if not delete_job_listing(db, listing_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job listing not found")
     return {"message": "Job listing deleted"}
+
+
+@router.delete("/job-listings/older-than-24h/all")
+def delete_old_job_listings_admin(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_admin),
+):
+    """Delete all job listings older than 24 hours. Admin only."""
+    deleted = delete_old_job_listings(db, hours=24)
+    logger.info("Admin %s deleted old job listings (>24h): %d", user.email, deleted)
+    return {"message": f"Deleted {deleted} job listings older than 24h", "deleted": deleted}
+
+
+@router.get("/feedback")
+def list_feedback(
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_admin),
+):
+    items, total = get_feedback_paginated(db, search=search, page=page, page_size=page_size)
+    out = [
+        AdminFeedbackResponse(
+            id=f.id,
+            user_id=u.id,
+            user_email=u.email,
+            category=f.category,
+            message=f.message,
+            rating=f.rating,
+            page=f.page,
+            created_at=f.created_at.isoformat() if f.created_at else None,
+        )
+        for f, u in items
+    ]
+    return {"items": out, "total": total}

@@ -43,4 +43,4 @@ class TailorResumeFromJdRequest(BaseModel):
 
 
 class LatexRenderRequest(BaseModel):
-    latex: str = Field(min_length=1, max_length=200000)
+    latex: str = Field(min_length=1, max_length=60000)

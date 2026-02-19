@@ -25,6 +25,11 @@ function dtoToListing(d: JobMatchResultDto, status: ApplicationStatus): JobListi
 @Injectable({ providedIn: 'root' })
 export class JobsService {
   private jobs$ = new BehaviorSubject<JobListing[]>([]);
+  private lastPendingPage = 1;
+  private lastAppliedPage = 1;
+  private lastPageSize = 21;
+  private lastPendingSearch = '';
+  private lastAppliedSearch = '';
 
   constructor(private jobsApi: JobsApiService) {
     document.addEventListener('visibilitychange', () => {
@@ -110,26 +115,58 @@ export class JobsService {
   }
 
   /** Fetch LLM-matched jobs from backend (active + applied). */
-  fetchFromApi(): Observable<{ success: boolean; error?: string; count?: number }> {
+  fetchFromApi(params?: {
+    pendingPage?: number;
+    appliedPage?: number;
+    pageSize?: number;
+    pendingSearch?: string;
+    appliedSearch?: string;
+  }): Observable<{ success: boolean; error?: string; count?: number; activeTotal?: number; appliedTotal?: number }> {
+    if (params?.pendingPage != null) this.lastPendingPage = params.pendingPage;
+    if (params?.appliedPage != null) this.lastAppliedPage = params.appliedPage;
+    if (params?.pageSize != null) this.lastPageSize = params.pageSize;
+    if (params?.pendingSearch != null) this.lastPendingSearch = params.pendingSearch;
+    if (params?.appliedSearch != null) this.lastAppliedSearch = params.appliedSearch;
     return new Observable((obs) => {
-      this.jobsApi.getJobs().subscribe({
-        next: (res) => {
-          this.setJobs(res.active, res.applied);
-          obs.next({ success: true, count: res.active.length + res.applied.length });
-          obs.complete();
-        },
-        error: (err) => {
-          const msg = err.error?.detail || err.message || 'Failed to fetch jobs';
-          obs.next({ success: false, error: msg });
-          obs.complete();
-        },
-      });
+      this.jobsApi
+        .getJobs({
+          pending_page: this.lastPendingPage,
+          applied_page: this.lastAppliedPage,
+          page_size: this.lastPageSize,
+          pending_search: this.lastPendingSearch,
+          applied_search: this.lastAppliedSearch,
+        })
+        .subscribe({
+          next: (res) => {
+            this.setJobs(res.active, res.applied);
+            obs.next({
+              success: true,
+              count: (res.active_total ?? res.active.length) + (res.applied_total ?? res.applied.length),
+              activeTotal: res.active_total ?? res.active.length,
+              appliedTotal: res.applied_total ?? res.applied.length,
+            });
+            obs.complete();
+          },
+          error: (err) => {
+            const msg = err.error?.detail || err.message || 'Failed to fetch jobs';
+            obs.next({ success: false, error: msg });
+            obs.complete();
+          },
+        });
     });
   }
 
   private refreshFromApi(): void {
-    this.jobsApi.getJobs().subscribe({
-      next: (res) => this.setJobs(res.active, res.applied),
-    });
+    this.jobsApi
+      .getJobs({
+        pending_page: this.lastPendingPage,
+        applied_page: this.lastAppliedPage,
+        page_size: this.lastPageSize,
+        pending_search: this.lastPendingSearch,
+        applied_search: this.lastAppliedSearch,
+      })
+      .subscribe({
+        next: (res) => this.setJobs(res.active, res.applied),
+      });
   }
 }

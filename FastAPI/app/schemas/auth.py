@@ -58,6 +58,10 @@ class ChangePasswordRequest(BaseModel):
         return self
 
 
+class ResetPasswordRequest(ChangePasswordRequest):
+    token: str
+
+
 class UserProfileUpdate(BaseModel):
     email: EmailStr | None = None
     current_password: str | None = None
@@ -85,3 +89,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class RegisterMessage(BaseModel):
+    message: str

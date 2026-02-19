@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_admin, get_current_user_full_access
 from app.models.user import User
-from app.repos.user_job_match_repo import get_matches_for_user, update_status, delete_match, get_match_for_user
+from app.repos.user_job_match_repo import (
+    get_matches_for_user,
+    get_match_count_for_user,
+    update_status,
+    delete_match,
+    get_match_for_user,
+)
 from app.repos.resume_repo import get_latest_by_user
 from app.schemas.job import (
     JobMatchResult,
@@ -130,16 +136,47 @@ def get_applied_jobs(
 
 @router.get("", response_model=dict)
 def get_jobs(
-    limit: int = 100,
+    pending_page: int = 1,
+    applied_page: int = 1,
+    page_size: int = 6,
+    pending_search: str | None = None,
+    applied_search: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user_full_access),
 ):
-    """Return both active (pending) and applied jobs in one call."""
-    active = get_matches_for_user(db, user.id, status="pending", limit=limit)
-    applied = get_matches_for_user(db, user.id, status="applied", limit=limit)
+    """Return paginated active (pending) and applied jobs in one call."""
+    pending_page = max(1, pending_page)
+    applied_page = max(1, applied_page)
+    page_size = min(max(1, page_size), 100)
+    pending_offset = (pending_page - 1) * page_size
+    applied_offset = (applied_page - 1) * page_size
+
+    active = get_matches_for_user(
+        db,
+        user.id,
+        status="pending",
+        search=pending_search,
+        limit=page_size,
+        offset=pending_offset,
+    )
+    applied = get_matches_for_user(
+        db,
+        user.id,
+        status="applied",
+        search=applied_search,
+        limit=page_size,
+        offset=applied_offset,
+    )
+    active_total = get_match_count_for_user(db, user.id, status="pending", search=pending_search)
+    applied_total = get_match_count_for_user(db, user.id, status="applied", search=applied_search)
     return {
         "active": [_match_to_result(m) for m in active if m.job_listing],
         "applied": [_match_to_result(m) for m in applied if m.job_listing],
+        "active_total": active_total,
+        "applied_total": applied_total,
+        "pending_page": pending_page,
+        "applied_page": applied_page,
+        "page_size": page_size,
     }
 
 

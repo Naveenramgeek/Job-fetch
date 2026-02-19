@@ -20,15 +20,21 @@ from app.core.rate_limiter import rate_limiter
 from app.database import init_db, engine
 from app.dependencies import get_current_user_full_access
 from app.logging_config import setup_logging
-from app.routers import admin, auth, resume, jobs
+from app.routers import admin, auth, resume, jobs, feedback
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+_env = (settings.app_env or "development").lower()
+_docs_enabled = _env in {"development", "dev", "local"}
 
 app = FastAPI(
     title="JobFetch API",
     description="Auth, resume parsing, job tracking.",
     version="1.0.0",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 cors_origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
@@ -44,6 +50,7 @@ app.include_router(auth.router)
 app.include_router(resume.router)
 app.include_router(jobs.router)
 app.include_router(admin.router)
+app.include_router(feedback.router)
 
 
 @app.exception_handler(Exception)
@@ -58,10 +65,18 @@ async def apply_rate_limits(request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    client_ip = request.client.host if request.client else "unknown"
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    client_ip = forwarded_for.split(",")[0].strip() if forwarded_for else (request.client.host if request.client else "unknown")
     limit = None
     window = 60
-    if path in {"/auth/login", "/auth/register", "/auth/forgot-password"}:
+    if path in {
+        "/auth/login",
+        "/auth/register",
+        "/auth/forgot-password",
+        "/auth/resend-activation",
+        "/auth/reset-password",
+        "/auth/activate",
+    }:
         limit = settings.rate_limit_auth_per_min
     elif path == "/parse":
         limit = settings.rate_limit_parse_per_min
@@ -84,12 +99,12 @@ async def apply_rate_limits(request, call_next):
 
 
 @app.get("/health/live")
-def health_live():
+def health_live(_user=Depends(get_current_user_full_access)):
     return {"status": "ok"}
 
 
 @app.get("/health/ready")
-def health_ready():
+def health_ready(_user=Depends(get_current_user_full_access)):
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -117,7 +132,7 @@ def on_startup():
 
 
 @app.get("/")
-def root():
+def root(_user=Depends(get_current_user_full_access)):
     return {"message": "Resume Parser API. POST a PDF to /parse to get structured resume data."}
 
 
