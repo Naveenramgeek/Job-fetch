@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import {
   AdminApiService,
   AdminStats,
@@ -18,7 +18,7 @@ import { ConfirmActionDialogComponent } from '../confirm-action-dialog/confirm-a
   templateUrl: './admin-page.component.html',
   styleUrls: ['./admin-page.component.scss'],
 })
-export class AdminPageComponent implements OnInit {
+export class AdminPageComponent implements OnInit, OnDestroy {
   readonly tabUsers: 'users' = 'users';
   readonly tabJobs: 'jobs' = 'jobs';
   readonly tabOldJobs: 'old_jobs' = 'old_jobs';
@@ -41,6 +41,9 @@ export class AdminPageComponent implements OnInit {
   recurringMessage = '';
   seedLoading = false;
   seedMessage = '';
+  nowMs = Date.now();
+  private liveClockIntervalId: ReturnType<typeof setInterval> | null = null;
+  private pipelineStatusPollIntervalId: ReturnType<typeof setInterval> | null = null;
 
   // User form
   showUserForm = false;
@@ -97,6 +100,18 @@ export class AdminPageComponent implements OnInit {
     this.loadJobListings();
     this.loadOldJobListings();
     this.loadFeedback();
+    this.startPipelineStatusLiveRefresh();
+  }
+
+  ngOnDestroy(): void {
+    if (this.liveClockIntervalId) {
+      clearInterval(this.liveClockIntervalId);
+      this.liveClockIntervalId = null;
+    }
+    if (this.pipelineStatusPollIntervalId) {
+      clearInterval(this.pipelineStatusPollIntervalId);
+      this.pipelineStatusPollIntervalId = null;
+    }
   }
 
   selectTab(tab: 'users' | 'jobs' | 'old_jobs' | 'feedback'): void {
@@ -115,6 +130,22 @@ export class AdminPageComponent implements OnInit {
       next: (s) => (this.pipelineStatus = s),
       error: () => (this.pipelineStatus = null),
     });
+  }
+
+  nextRunIn(): string {
+    if (!this.pipelineStatus?.running || !this.pipelineStatus.next_run) return '-';
+    const next = this.safeMs(this.pipelineStatus.next_run);
+    if (next == null) return '-';
+    const diffSec = Math.max(0, Math.ceil((next - this.nowMs) / 1000));
+    return this.formatDuration(diffSec, true);
+  }
+
+  lastRunAgo(): string {
+    if (!this.pipelineStatus?.last_run) return '-';
+    const last = this.safeMs(this.pipelineStatus.last_run);
+    if (last == null) return '-';
+    const diffSec = Math.max(0, Math.floor((this.nowMs - last) / 1000));
+    return `${this.formatDuration(diffSec, diffSec < 3600)} ago`;
   }
 
   loadStats(): void {
@@ -640,5 +671,35 @@ export class AdminPageComponent implements OnInit {
         isDanger: data.isDanger ?? false,
       },
     });
+  }
+
+  private startPipelineStatusLiveRefresh(): void {
+    // 1-second tick for live "next run in" / "last run ago" text.
+    this.liveClockIntervalId = setInterval(() => {
+      this.nowMs = Date.now();
+    }, 1000);
+    // Poll scheduler status periodically to keep timestamps current.
+    this.pipelineStatusPollIntervalId = setInterval(() => {
+      this.loadPipelineStatus();
+    }, 15000);
+  }
+
+  private safeMs(iso: string | null): number | null {
+    if (!iso) return null;
+    const ms = new Date(iso).getTime();
+    return Number.isNaN(ms) ? null : ms;
+  }
+
+  private formatDuration(totalSeconds: number, includeSeconds: boolean): string {
+    const clamped = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(clamped / 3600);
+    const minutes = Math.floor((clamped % 3600) / 60);
+    const seconds = clamped % 60;
+
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (hours > 0 || minutes > 0) parts.push(`${minutes}m`);
+    if (includeSeconds || (hours === 0 && minutes === 0)) parts.push(`${seconds}s`);
+    return parts.join(' ');
   }
 }
