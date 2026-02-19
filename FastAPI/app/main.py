@@ -21,6 +21,7 @@ from app.database import init_db, engine
 from app.dependencies import get_current_user_full_access
 from app.logging_config import setup_logging
 from app.routers import admin, auth, resume, jobs, feedback
+from app.services.pipeline_scheduler import recover_scheduler_from_db
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ def on_startup():
         if "username:password@" in settings.database_url:
             logger.warning("DATABASE_URL appears to use placeholder credentials. Set DATABASE_URL in .env.")
     init_db()
+    recover_scheduler_from_db()
 
 
 @app.get("/")
