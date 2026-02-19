@@ -78,8 +78,8 @@ def render_latex_to_pdf_bytes(latex: str) -> bytes:
             "-halt-on-error",
             "-file-line-error",
             "-output-directory",
-            str(tmp),
-            str(tex_path),
+            ".",
+            tex_path.name,
         ]
         env = os.environ.copy()
         tex_bin_dir = str(Path(pdflatex_bin).parent)
