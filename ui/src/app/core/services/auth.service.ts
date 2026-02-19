@@ -54,13 +54,24 @@ export class AuthService {
   }
 
   get token(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   }
 
   private loadUser(): User | null {
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const stored = localStorage.getItem(USER_KEY);
+      // One-time migration from localStorage to sessionStorage for safer token handling.
+      const legacyToken = localStorage.getItem(TOKEN_KEY);
+      const legacyUser = localStorage.getItem(USER_KEY);
+      if (!sessionStorage.getItem(TOKEN_KEY) && legacyToken) {
+        sessionStorage.setItem(TOKEN_KEY, legacyToken);
+        localStorage.removeItem(TOKEN_KEY);
+      }
+      if (!sessionStorage.getItem(USER_KEY) && legacyUser) {
+        sessionStorage.setItem(USER_KEY, legacyUser);
+        localStorage.removeItem(USER_KEY);
+      }
+      const token = sessionStorage.getItem(TOKEN_KEY);
+      const stored = sessionStorage.getItem(USER_KEY);
       if (!token || !stored) return null;
       if (isTokenExpired(token)) {
         this.clearStoredAuth();
@@ -73,12 +84,14 @@ export class AuthService {
   }
 
   private clearStoredAuth(): void {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }
 
   setAuthFromResponse(res: AuthResponse): void {
-    localStorage.setItem(TOKEN_KEY, res.access_token);
+    sessionStorage.setItem(TOKEN_KEY, res.access_token);
     const user: User = {
       id: res.user.id,
       email: res.user.email,
@@ -88,7 +101,7 @@ export class AuthService {
       requiresPasswordChange: res.user.requires_password_change ?? false,
     };
     this.currentUser$.next(user);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 
   login(email: string, password: string): Observable<{ success: boolean; error?: string }> {
@@ -121,7 +134,7 @@ export class AuthService {
     if (u) {
       const updated = { ...u, hasResume };
       this.currentUser$.next(updated);
-      localStorage.setItem(USER_KEY, JSON.stringify(updated));
+      sessionStorage.setItem(USER_KEY, JSON.stringify(updated));
     }
   }
 
@@ -138,7 +151,7 @@ export class AuthService {
             requiresPasswordChange: res.requires_password_change ?? false,
           };
           this.currentUser$.next(user);
-          localStorage.setItem(USER_KEY, JSON.stringify(user));
+          sessionStorage.setItem(USER_KEY, JSON.stringify(user));
           obs.next({ success: true });
           obs.complete();
         },

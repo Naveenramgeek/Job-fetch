@@ -63,6 +63,7 @@ jobs:
             python3 -m venv .venv || true
             source .venv/bin/activate
             pip install -r requirements.txt
+            python -m app.scripts.migrate_db
 
             # Restart API service if configured on server.
             # Ensure deploy user has permissions for this command.

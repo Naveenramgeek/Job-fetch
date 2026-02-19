@@ -15,14 +15,17 @@ import { ApplicationStatusDialogComponent } from '../application-status-dialog/a
   styleUrls: ['./dashboard-page.component.scss'],
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
+  readonly tabActive: 'active' = 'active';
+  readonly tabApplied: 'applied' = 'applied';
+  selectedTab: 'active' | 'applied' = 'active';
   jobs: JobListing[] = [];
-  private pendingJobs: JobListing[] = [];
-  private appliedJobs: JobListing[] = [];
-  jobListings: JobListing[] = [];
-  appliedByDate: { date: string; jobs: JobListing[] }[] = [];
+  pendingJobs: JobListing[] = [];
+  appliedJobs: JobListing[] = [];
   pendingPage = 1;
   appliedPage = 1;
-  readonly jobsPerPage = 6;
+  readonly jobsPerPage = 21;
+  pendingSearch = '';
+  appliedSearch = '';
   pendingTotal = 0;
   appliedTotal = 0;
   fetchLoading = false;
@@ -42,7 +45,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.jobs = j;
       this.pendingJobs = j.filter((job) => job.status === 'pending');
       this.appliedJobs = j.filter((job) => job.status === 'applied');
-      this.refreshPagination();
     });
 
     this.jobsService.setOnReturnCallback((jobId) => {
@@ -69,20 +71,30 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   loadJobs(): void {
     this.fetchError = '';
     this.fetchLoading = true;
-    this.jobsService.fetchFromApi().subscribe({
-      next: (res) => {
-        this.fetchLoading = false;
-        if (res.success) {
-          this.fetchError = '';
-        } else {
-          this.fetchError = res.error ?? 'Failed to fetch jobs';
-        }
-      },
-      error: () => {
-        this.fetchLoading = false;
-        this.fetchError = 'Failed to fetch jobs';
-      },
-    });
+    this.jobsService
+      .fetchFromApi({
+        pendingPage: this.pendingPage,
+        appliedPage: this.appliedPage,
+        pageSize: this.jobsPerPage,
+        pendingSearch: this.pendingSearch,
+        appliedSearch: this.appliedSearch,
+      })
+      .subscribe({
+        next: (res) => {
+          this.fetchLoading = false;
+          if (res.success) {
+            this.fetchError = '';
+            this.pendingTotal = res.activeTotal ?? 0;
+            this.appliedTotal = res.appliedTotal ?? 0;
+          } else {
+            this.fetchError = res.error ?? 'Failed to fetch jobs';
+          }
+        },
+        error: () => {
+          this.fetchLoading = false;
+          this.fetchError = 'Failed to fetch jobs';
+        },
+      });
   }
 
   fetchJobs(): void {
@@ -117,9 +129,18 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     return Date.now() - created > 24 * 60 * 60 * 1000;
   }
 
-  deleteJob(job: JobListing, event?: Event): void {
-    if (event) event.stopPropagation();
-    this.jobsService.deleteJob(job.id);
+  selectTab(tab: 'active' | 'applied'): void {
+    this.selectedTab = tab;
+  }
+
+  onPendingSearch(): void {
+    this.pendingPage = 1;
+    this.loadJobs();
+  }
+
+  onAppliedSearch(): void {
+    this.appliedPage = 1;
+    this.loadJobs();
   }
 
   formatDate(dateStr: string): string {
@@ -176,52 +197,25 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   prevPendingPage(): void {
     if (!this.canPrevPending()) return;
     this.pendingPage -= 1;
-    this.refreshPagination();
+    this.loadJobs();
   }
 
   nextPendingPage(): void {
     if (!this.canNextPending()) return;
     this.pendingPage += 1;
-    this.refreshPagination();
+    this.loadJobs();
   }
 
   prevAppliedPage(): void {
     if (!this.canPrevApplied()) return;
     this.appliedPage -= 1;
-    this.refreshPagination();
+    this.loadJobs();
   }
 
   nextAppliedPage(): void {
     if (!this.canNextApplied()) return;
     this.appliedPage += 1;
-    this.refreshPagination();
-  }
-
-  private refreshPagination(): void {
-    this.pendingTotal = this.pendingJobs.length;
-    const pendingPages = this.pendingTotalPages();
-    this.pendingPage = Math.min(Math.max(this.pendingPage, 1), pendingPages);
-    const pendingStart = (this.pendingPage - 1) * this.jobsPerPage;
-    this.jobListings = this.pendingJobs.slice(pendingStart, pendingStart + this.jobsPerPage);
-
-    this.appliedTotal = this.appliedJobs.length;
-    const appliedPages = this.appliedTotalPages();
-    this.appliedPage = Math.min(Math.max(this.appliedPage, 1), appliedPages);
-    const appliedStart = (this.appliedPage - 1) * this.jobsPerPage;
-    const appliedPageJobs = this.appliedJobs.slice(appliedStart, appliedStart + this.jobsPerPage);
-    this.appliedByDate = this.groupAppliedByDate(appliedPageJobs);
-  }
-
-  private groupAppliedByDate(applied: JobListing[]): { date: string; jobs: JobListing[] }[] {
-    const byDate = new Map<string, JobListing[]>();
-    applied.forEach((job) => {
-      const d = job.appliedAt || 'Unknown';
-      if (!byDate.has(d)) byDate.set(d, []);
-      byDate.get(d)!.push(job);
-    });
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([date, jobs]) => ({ date, jobs }));
+    this.loadJobs();
   }
 
 }

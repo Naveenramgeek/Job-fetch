@@ -1,0 +1,51 @@
+<div class="feedback-page">
+  <div class="feedback-header">
+    <h1>Feedback</h1>
+    <p>Tell us what is working well and what we should improve.</p>
+  </div>
+
+  <section class="feedback-card">
+    <form (ngSubmit)="submit()" class="feedback-form">
+      <mat-form-field appearance="outline">
+        <mat-label>Category</mat-label>
+        <mat-select [(ngModel)]="category" name="category">
+          <mat-option *ngFor="let c of categories" [value]="c">{{ c }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Rating (optional)</mat-label>
+        <mat-select [(ngModel)]="rating" name="rating">
+          <mat-option [value]="null">No rating</mat-option>
+          <mat-option [value]="5">5 - Excellent</mat-option>
+          <mat-option [value]="4">4 - Good</mat-option>
+          <mat-option [value]="3">3 - Average</mat-option>
+          <mat-option [value]="2">2 - Needs improvement</mat-option>
+          <mat-option [value]="1">1 - Poor</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Your feedback</mat-label>
+        <textarea
+          matInput
+          rows="8"
+          [(ngModel)]="message"
+          name="message"
+          maxlength="5000"
+          placeholder="Share your experience, pain points, or feature suggestions..."
+          required
+        ></textarea>
+      </mat-form-field>
+
+      <p class="error-msg" *ngIf="error">{{ error }}</p>
+      <p class="success-msg" *ngIf="success">{{ success }}</p>
+
+      <button mat-raised-button color="primary" type="submit" [disabled]="loading || !message.trim()">
+        <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
+        <mat-icon *ngIf="!loading">send</mat-icon>
+        Submit feedback
+      </button>
+    </form>
+  </section>
+</div>

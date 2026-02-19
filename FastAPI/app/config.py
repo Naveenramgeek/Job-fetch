@@ -23,6 +23,15 @@ class Settings(BaseSettings):
 
     # For production, keep this false so temp passwords are never returned in API responses.
     expose_temp_password_in_response: bool = False
+    require_email_activation: bool = True
+    activation_token_expire_minutes: int = 60 * 24  # 24 hours
+    reset_password_token_expire_minutes: int = 30
+    frontend_base_url: str = "http://localhost:4200"
+
+    # Mailgun email config (optional but recommended when email activation is enabled)
+    mailgun_api_key: str | None = None
+    mailgun_domain: str | None = None
+    mailgun_from_email: str | None = None
 
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
 

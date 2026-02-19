@@ -19,6 +19,7 @@
         <input matInput type="password" [(ngModel)]="confirmPassword" name="confirmPassword" placeholder="Repeat your password" [disabled]="loading" />
       </mat-form-field>
       <p class="error-msg" *ngIf="error">{{ error }}</p>
+      <p class="success-msg" *ngIf="successMessage">{{ successMessage }}</p>
       <button mat-raised-button color="primary" type="submit" class="signup-btn" [disabled]="loading">
         <mat-spinner *ngIf="loading" diameter="20" class="btn-spinner"></mat-spinner>
         <span *ngIf="!loading">Create account</span>

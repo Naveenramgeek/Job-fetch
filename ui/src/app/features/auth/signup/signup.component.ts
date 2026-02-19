@@ -14,6 +14,7 @@ export class SignupComponent {
   confirmPassword = '';
   loading = false;
   error = '';
+  successMessage = '';
 
   constructor(
     private authApi: AuthApiService,
@@ -23,6 +24,7 @@ export class SignupComponent {
 
   onSubmit(): void {
     this.error = '';
+    this.successMessage = '';
     if (!this.email?.trim()) {
       this.error = 'Email is required';
       return;
@@ -48,8 +50,13 @@ export class SignupComponent {
       })
       .subscribe({
         next: (res) => {
-          this.auth.setAuthFromResponse(res);
-          this.router.navigate(['/dashboard']);
+          if ('access_token' in res) {
+            this.auth.setAuthFromResponse(res);
+            this.router.navigate(['/dashboard']);
+            return;
+          }
+          this.successMessage = res.message || 'Registration successful. Please check your email to activate your account.';
+          this.router.navigate(['/auth/login'], { queryParams: { activation_required: '1' } });
         },
         error: (err) => {
           this.error = err.error?.detail || err.message || 'Registration failed';

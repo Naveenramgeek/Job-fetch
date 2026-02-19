@@ -1,4 +1,12 @@
 <div class="tailor-page">
+  <div class="editor-tip-popup" *ngIf="showEditorTipPopup">
+    <div class="editor-tip-card">
+      <h4>Editing Tip</h4>
+      <p>You can edit the generated LaTeX to add or remove content for more accurate resume results.</p>
+      <button mat-raised-button color="primary" type="button" (click)="closeEditorTipPopup()">Got it</button>
+    </div>
+  </div>
+
   <div class="alert" *ngIf="alertVisible" [class.success]="alertType === 'success'" [class.error]="alertType === 'error'" [class.warning]="alertType === 'warning'">
     <span>{{ alertMessage }}</span>
     <button type="button" class="alert-close" (click)="closeAlert()" aria-label="Close alert">×</button>

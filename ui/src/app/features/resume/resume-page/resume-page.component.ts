@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, DoCheck, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -21,6 +21,10 @@ import {
 } from '../../../models/resume.model';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { pageEnter, editEnter } from '../../../animations';
+import { MatDialog } from '@angular/material/dialog';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { UnsavedResumeWarningDialogComponent } from '../unsaved-resume-warning-dialog/unsaved-resume-warning-dialog.component';
 
 @Component({
   selector: 'app-resume-page',
@@ -28,7 +32,7 @@ import { pageEnter, editEnter } from '../../../animations';
   styleUrls: ['./resume-page.component.scss'],
   animations: [pageEnter, editEnter],
 })
-export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
+export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy, DoCheck {
   @ViewChild('resumeTailorEditor') resumeTailorEditorRef?: ElementRef<HTMLDivElement>;
 
   resume: StructuredResume | null = null;
@@ -46,6 +50,8 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private tailorPdfObjectUrl: string | null = null;
   private tailorEditorView: EditorView | null = null;
   private syncingTailorEditor = false;
+  private savedResumeSnapshot: string | null = null;
+  private hasUnsavedResumeChanges = false;
 
   constructor(
     private api: ResumeApiService,
@@ -53,6 +59,7 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     public auth: AuthService,
     private snackBar: MatSnackBar,
     private sanitizer: DomSanitizer,
+    private dialog: MatDialog,
   ) {}
 
   ngOnInit(): void {
@@ -67,6 +74,10 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  ngDoCheck(): void {
+    this.refreshDirtyState();
+  }
+
   ngOnDestroy(): void {
     this.cleanupTailorPdfObjectUrl();
     this.tailorEditorView?.destroy();
@@ -79,12 +90,16 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.getResume().subscribe({
       next: (res) => {
         this.resume = this.normalizeResume(res.parsed_data);
+        this.savedResumeSnapshot = this.serializeResume(this.resume);
+        this.hasUnsavedResumeChanges = false;
         this.loading = false;
       },
       error: (err) => {
         this.loading = false;
         if (err.status === 404) {
           this.auth.setHasResume(false);
+          this.savedResumeSnapshot = null;
+          this.hasUnsavedResumeChanges = false;
         } else {
           this.uploadError = err.error?.detail || 'Failed to load saved resume.';
         }
@@ -98,7 +113,7 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       this.uploadError = 'Please select a PDF file.';
-      this.snackBar.open('Please select a PDF file.', 'Close', { duration: 3000 });
+      this.showTopMessage('Please select a PDF file.', 'error', 3000);
       input.value = '';
       return;
     }
@@ -115,13 +130,14 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.activeTabIndex = 0;
         this.loading = false;
         this.auth.setHasResume(true);
-        this.snackBar.open('PDF parsed. Review and save your resume.', 'Close', { duration: 4000 });
+        this.hasUnsavedResumeChanges = true;
+        this.showTopMessage('PDF parsed. Review and save your resume.', 'success', 4000);
         input.value = '';
       },
       error: (err) => {
         this.loading = false;
         this.uploadError = err.error?.detail || err.message || 'Failed to parse PDF.';
-        this.snackBar.open(this.uploadError ?? 'Failed to parse PDF.', 'Close', { duration: 5000 });
+        this.showTopMessage(this.uploadError ?? 'Failed to parse PDF.', 'error', 5000);
         input.value = '';
       },
     });
@@ -390,15 +406,15 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     a.download = 'resume-structured.json';
     a.click();
     URL.revokeObjectURL(a.href);
-    this.snackBar.open('JSON downloaded.', 'Close', { duration: 2000 });
+    this.showTopMessage('JSON downloaded.', 'success', 2000);
   }
 
   copyJson(): void {
     if (!this.resume) return;
     navigator.clipboard.writeText(JSON.stringify(this.resume, null, 2)).then(() => {
-      this.snackBar.open('JSON copied to clipboard.', 'Close', { duration: 2000 });
+      this.showTopMessage('JSON copied to clipboard.', 'success', 2000);
     }).catch(() => {
-      this.snackBar.open('Copy failed.', 'Close', { duration: 2000 });
+      this.showTopMessage('Copy failed.', 'error', 2000);
     });
   }
 
@@ -406,18 +422,20 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.resume) return;
     const validationError = this.validateRequiredFields(this.resume);
     if (validationError) {
-      this.snackBar.open(validationError, 'Close', { duration: 5000 });
+      this.showTopMessage(validationError, 'error', 5000);
       return;
     }
     this.saving = true;
     const onSuccess = () => {
       this.saving = false;
       this.auth.setHasResume(true);
-      this.snackBar.open('Resume saved.', 'Close', { duration: 3000 });
+      this.savedResumeSnapshot = this.serializeResume(this.resume);
+      this.hasUnsavedResumeChanges = false;
+      this.showTopMessage('Resume saved.', 'success', 3000);
     };
     const onError = (err: { status?: number; error?: { detail?: string } }) => {
       this.saving = false;
-      this.snackBar.open(err.error?.detail || 'Failed to save.', 'Close', { duration: 4000 });
+      this.showTopMessage(err.error?.detail || 'Failed to save.', 'error', 4000);
     };
     // Try update first; if 404 (no resume yet), create instead
     this.api.updateResume(this.resume).subscribe({
@@ -544,6 +562,20 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.tailorError = '';
     this.cleanupTailorPdfObjectUrl();
     this.tailorPdfPreviewUrl = null;
+    this.savedResumeSnapshot = null;
+    this.hasUnsavedResumeChanges = false;
+  }
+
+  canDeactivate(): boolean | Observable<boolean> {
+    this.refreshDirtyState();
+    if (!this.hasUnsavedResumeChanges) return true;
+    const warning = this.getLeaveWarningMessage();
+    const ref = this.dialog.open(UnsavedResumeWarningDialogComponent, {
+      width: '520px',
+      disableClose: true,
+      data: { message: warning },
+    });
+    return ref.afterClosed().pipe(map((action) => action === 'leave'));
   }
 
   getCustomSections(): CustomSection[] {
@@ -588,6 +620,57 @@ export class ResumePageComponent implements OnInit, AfterViewInit, OnDestroy {
       URL.revokeObjectURL(this.tailorPdfObjectUrl);
       this.tailorPdfObjectUrl = null;
     }
+  }
+
+  private showTopMessage(message: string, type: 'success' | 'error', duration = 3000): void {
+    this.snackBar.open(message, 'Close', {
+      duration,
+      horizontalPosition: 'center',
+      verticalPosition: 'top',
+      panelClass: type === 'success' ? ['snack-success'] : ['snack-error'],
+    });
+  }
+
+  private serializeResume(resume: StructuredResume | null): string | null {
+    if (!resume) return null;
+    try {
+      return JSON.stringify(resume);
+    } catch {
+      return null;
+    }
+  }
+
+  private refreshDirtyState(): void {
+    const current = this.serializeResume(this.resume);
+    this.hasUnsavedResumeChanges = current !== this.savedResumeSnapshot;
+  }
+
+  private collectValidationErrorsForLeave(resume: StructuredResume): string[] {
+    const errors: string[] = [];
+    if (!resume.contact?.name?.trim()) errors.push('Name is required');
+    if (!resume.contact?.title?.trim()) errors.push('Professional title is required');
+    if (!resume.contact?.email?.trim()) errors.push('Email is required');
+
+    if (!Array.isArray(resume.education) || resume.education.length === 0) {
+      errors.push('At least one education entry is required');
+      return errors;
+    }
+
+    const firstInvalidEducation = resume.education.find(
+      (e) => !e.degree?.trim() || !e.institution?.trim() || !e.start?.trim() || !e.end?.trim()
+    );
+    if (firstInvalidEducation) {
+      errors.push('Education entries require Degree, Institution, Start and End');
+    }
+    return errors;
+  }
+
+  private getLeaveWarningMessage(): string {
+    const base = 'You have unsaved resume changes. Please save your resume before leaving this page.';
+    if (!this.resume) return base;
+    const errors = this.collectValidationErrorsForLeave(this.resume);
+    if (!errors.length) return base;
+    return `${base}\nPlease fix before save: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? ', ...' : ''}`;
   }
 
 }

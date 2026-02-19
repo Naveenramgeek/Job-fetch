@@ -2,7 +2,38 @@ import shutil
 import subprocess
 import tempfile
 import os
+import re
 from pathlib import Path
+
+MAX_LATEX_CHARS = 60000
+_FORBIDDEN_LATEX_PATTERNS = [
+    re.compile(r"\\include\b", re.IGNORECASE),
+    re.compile(r"\\openin\b", re.IGNORECASE),
+    re.compile(r"\\read\b", re.IGNORECASE),
+    re.compile(r"\\write18\b", re.IGNORECASE),
+    re.compile(r"\\verbatiminput\b", re.IGNORECASE),
+    re.compile(r"\\lstinputlisting\b", re.IGNORECASE),
+    re.compile(r"\\usepackage\s*\{\s*shellesc\s*\}", re.IGNORECASE),
+]
+
+
+def _validate_latex_security(latex: str) -> str:
+    source = (latex or "").strip()
+    if not source:
+        raise RuntimeError("LaTeX content is empty")
+    if len(source) > MAX_LATEX_CHARS:
+        raise RuntimeError("LaTeX content is too large for safe rendering")
+    if ".." in source:
+        raise RuntimeError("Unsafe LaTeX content detected")
+    for pattern in _FORBIDDEN_LATEX_PATTERNS:
+        if pattern.search(source):
+            raise RuntimeError("Unsafe LaTeX command detected")
+    # Allow only local fallback include used by resume templates.
+    for match in re.finditer(r"\\input\s*\{([^}]*)\}", source, flags=re.IGNORECASE):
+        input_target = (match.group(1) or "").strip().lower()
+        if input_target not in {"glyphtounicode", "glyphtounicode.tex"}:
+            raise RuntimeError("Only \\input{glyphtounicode} is allowed")
+    return source
 
 
 def _resolve_pdflatex_binary() -> str | None:
@@ -28,6 +59,7 @@ def render_latex_to_pdf_bytes(latex: str) -> bytes:
     pdflatex_bin = _resolve_pdflatex_binary()
     if not pdflatex_bin:
         raise RuntimeError("pdflatex is not installed on the server")
+    safe_latex = _validate_latex_security(latex)
 
     with tempfile.TemporaryDirectory(prefix="latex_render_") as tmpdir:
         tmp = Path(tmpdir)
@@ -37,12 +69,14 @@ def render_latex_to_pdf_bytes(latex: str) -> bytes:
         # Some resume templates include \input{glyphtounicode}; provide a local fallback.
         # This prevents hard failures when the TeX distribution does not ship this file.
         (tmp / "glyphtounicode.tex").write_text("\\pdfgentounicode=1\n", encoding="utf-8")
-        tex_path.write_text(latex or "", encoding="utf-8")
+        tex_path.write_text(safe_latex, encoding="utf-8")
 
         cmd = [
             pdflatex_bin,
+            "-no-shell-escape",
             "-interaction=nonstopmode",
             "-halt-on-error",
+            "-file-line-error",
             "-output-directory",
             str(tmp),
             str(tex_path),
@@ -50,6 +84,8 @@ def render_latex_to_pdf_bytes(latex: str) -> bytes:
         env = os.environ.copy()
         tex_bin_dir = str(Path(pdflatex_bin).parent)
         env["PATH"] = f"{tex_bin_dir}:{env.get('PATH', '')}"
+        env["openin_any"] = "p"
+        env["openout_any"] = "p"
         proc = subprocess.run(
             cmd,
             cwd=str(tmp),

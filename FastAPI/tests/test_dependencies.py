@@ -10,9 +10,10 @@ class _Creds:
 
 
 class _User:
-    def __init__(self, user_id="u1", is_admin=False):
+    def __init__(self, user_id="u1", is_admin=False, is_active=True):
         self.id = user_id
         self.is_admin = is_admin
+        self.is_active = is_active
 
 
 def test_get_current_user_missing_credentials():
@@ -42,6 +43,14 @@ def test_get_current_user_success(monkeypatch):
     monkeypatch.setattr(deps, "get_by_id", lambda db, uid: user)
     out = deps.get_current_user(db=object(), credentials=_Creds("tok"))
     assert out is user
+
+
+def test_get_current_user_inactive(monkeypatch):
+    monkeypatch.setattr(deps, "decode_access_token", lambda token: "u1")
+    monkeypatch.setattr(deps, "get_by_id", lambda db, uid: _User(user_id="u1", is_active=False))
+    with pytest.raises(HTTPException) as ex:
+        deps.get_current_user(db=object(), credentials=_Creds("tok"))
+    assert ex.value.status_code == 403
 
 
 def test_get_current_user_full_access_blocks_temp(monkeypatch):

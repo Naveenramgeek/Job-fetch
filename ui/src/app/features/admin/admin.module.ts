@@ -12,12 +12,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { AdminPageComponent } from './admin-page/admin-page.component';
 import { AdminRoutingModule } from './admin-routing.module';
+import { ConfirmActionDialogComponent } from './confirm-action-dialog/confirm-action-dialog.component';
 
 @NgModule({
-  declarations: [AdminPageComponent],
+  declarations: [AdminPageComponent, ConfirmActionDialogComponent],
   imports: [
     CommonModule,
     RouterModule,
@@ -33,6 +35,7 @@ import { AdminRoutingModule } from './admin-routing.module';
     MatSelectModule,
     MatCheckboxModule,
     MatTooltipModule,
+    MatDialogModule,
   ],
 })
 export class AdminModule {}

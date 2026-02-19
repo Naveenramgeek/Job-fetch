@@ -91,7 +91,6 @@
             <mat-option [value]="6">Certifications</mat-option>
             <mat-option [value]="7">Other</mat-option>
             <mat-option [value]="8">Your sections</mat-option>
-            <mat-option [value]="9">Tailor resume</mat-option>
           </mat-select>
         </mat-form-field>
       </div>
@@ -127,55 +126,6 @@
         </mat-tab>
         <mat-tab label="Your sections">
           <app-custom-sections [customSections]="getCustomSections()"></app-custom-sections>
-        </mat-tab>
-        <mat-tab label="Tailor Resume">
-          <div class="tailor-tab">
-            <div class="jd-inputs">
-              <mat-form-field appearance="outline">
-                <mat-label>Job title (optional)</mat-label>
-                <input matInput [(ngModel)]="tailorJobTitle" placeholder="Senior Backend Engineer" />
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Job description</mat-label>
-                <textarea
-                  matInput
-                  rows="8"
-                  [(ngModel)]="tailorJdText"
-                  placeholder="Paste full job description text here..."
-                ></textarea>
-              </mat-form-field>
-              <button mat-raised-button color="primary" (click)="generateTailorFromJd()" [disabled]="tailorLoading || !tailorJdText.trim()">
-                <mat-spinner *ngIf="tailorLoading" diameter="20" class="btn-spinner"></mat-spinner>
-                <span *ngIf="!tailorLoading">Tailor Resume</span>
-              </button>
-            </div>
-
-            <p class="error-msg" *ngIf="tailorError">{{ tailorError }}</p>
-
-            <div class="tailor-split">
-              <div class="tailor-panel">
-                <div class="tailor-panel-header">
-                  <h3>LaTeX</h3>
-                  <button mat-stroked-button (click)="downloadTailorTex()" [disabled]="!tailorLatex">Download text</button>
-                </div>
-                <div #resumeTailorEditor class="tailor-editor" [class.disabled]="tailorLoading"></div>
-              </div>
-
-              <div class="tailor-panel">
-                <div class="tailor-panel-header">
-                  <h3>PDF Preview</h3>
-                  <button mat-stroked-button color="primary" (click)="renderTailorPdf()" [disabled]="tailorRenderLoading || tailorLoading || !tailorLatex">
-                    Render PDF
-                  </button>
-                </div>
-                <div class="tailor-state" *ngIf="tailorLoading || tailorRenderLoading">Rendering preview...</div>
-                <iframe *ngIf="!tailorLoading && !tailorRenderLoading && tailorPdfPreviewUrl" [src]="tailorPdfPreviewUrl"></iframe>
-                <div class="tailor-state" *ngIf="!tailorLoading && !tailorRenderLoading && !tailorPdfPreviewUrl">
-                  Add JD text and click Tailor Resume.
-                </div>
-              </div>
-            </div>
-          </div>
         </mat-tab>
       </mat-tab-group>
     </div>

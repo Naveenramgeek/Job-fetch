@@ -38,6 +38,12 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+    if not getattr(user, "is_active", True):
+        logger.info("Auth failed: inactive user id=%s", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Please activate your account from your email.",
+        )
     return user
 
 

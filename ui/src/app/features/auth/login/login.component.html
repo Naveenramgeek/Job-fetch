@@ -6,6 +6,7 @@
       <p>Track jobs, manage resumes, stay organized</p>
     </div>
     <form class="login-form" (ngSubmit)="onSubmit()">
+      <p class="success-msg" *ngIf="banner">{{ banner }}</p>
       <mat-form-field appearance="outline" class="full">
         <mat-label>Email</mat-label>
         <input matInput type="email" [(ngModel)]="email" name="email" placeholder="you@example.com" [disabled]="loading" />

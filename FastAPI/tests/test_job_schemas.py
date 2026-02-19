@@ -18,3 +18,8 @@ def test_latex_render_request_requires_content():
 
     req = LatexRenderRequest(latex="\\documentclass{article}")
     assert req.latex.startswith("\\documentclass")
+
+
+def test_latex_render_request_enforces_max_length():
+    with pytest.raises(ValidationError):
+        LatexRenderRequest(latex="A" * 60001)
